@@ -23,7 +23,7 @@ class JSONView(View):
 class IndexMixin(object):
     @cached_property
     def index(self):
-        return models.BackingIndex.objects.get(pk=1)
+        raise NotImplementedError
 
     @cached_property
     def package(self):
@@ -47,7 +47,7 @@ class IndexMixin(object):
 
     @cached_property
     def platform(self):
-        return models.Platform.objects.get(pk=1)
+        raise NotImplementedError
 
     @cached_property
     def build(self):
@@ -58,7 +58,19 @@ class IndexMixin(object):
             return self.release.create_build(self.platform)
 
 
-class PackageInfo(IndexMixin, JSONView):
+class DevelopmentIndexMixin(IndexMixin):
+    @cached_property
+    def index(self):
+        # TODO: Get the index from the request context
+        return models.BackingIndex.objects.get(pk=1)
+
+    @cached_property
+    def platform(self):
+        # TODO: Get the platform from the request context
+        return models.Platform.objects.get(pk=1)
+
+
+class PackageInfo(DevelopmentIndexMixin, JSONView):
 
     def replace_url(self, url):
         url['url'] = self.request.build_absolute_uri(
@@ -82,7 +94,7 @@ class PackageInfo(IndexMixin, JSONView):
             self.index.get_package_details(self.package_name, self.version))
 
 
-class PackageLinks(IndexMixin, TemplateView):
+class PackageLinks(DevelopmentIndexMixin, TemplateView):
     template_name = 'index/simple.html'
 
     def get_context_data(self, **kwargs):
@@ -91,6 +103,6 @@ class PackageLinks(IndexMixin, TemplateView):
         return context
 
 
-class BuildView(IndexMixin, RedirectView):
+class BuildView(DevelopmentIndexMixin, RedirectView):
     def get_redirect_url(self, *args, **kwargs):
         return self.build.get_build_url()

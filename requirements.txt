@@ -7,5 +7,7 @@
 coolfig==0.3.0
 django-environ==0.4.0
 django==1.8.4
+jsonfield==1.0.3
 psycopg2==2.6.1
+requests==2.7.0
 six==1.9.0                 # via coolfig, django-environ

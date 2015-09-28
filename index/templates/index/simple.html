@@ -1,0 +1,14 @@
+<html>
+    <head>
+        <title>Links for {{ details.info.name.lower }}</title>
+        <meta name="api-version" value="2" />
+    </head>
+    <body>
+        <h1>Links for {{ details.info.name.lower }}</h1>
+        {% for version, releases in details.releases.items %}
+            {% for release in releases %}
+                <a href="{% url "index:download_release" package_name=details.info.name version=version filename=release.filename %}#md5={{ release.md5_digest }}" rel="internal">{{ release.filename }}</a><br />
+            {% endfor %}
+        {% endfor %}
+    </body>
+</html>

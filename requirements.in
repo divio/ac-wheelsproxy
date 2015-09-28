@@ -1,0 +1,4 @@
+Django>=1.8,<1.9
+coolfig==0.3.0
+django-environ
+psycopg2

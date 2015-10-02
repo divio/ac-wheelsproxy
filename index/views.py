@@ -2,7 +2,6 @@ import json
 
 import six
 
-from django.core.urlresolvers import reverse
 from django.http import HttpResponse
 from django.views.generic import RedirectView, View, TemplateView
 from django.utils.text import slugify
@@ -27,9 +26,7 @@ class IndexMixin(object):
 
     @cached_property
     def package(self):
-        package, created = models.Package.objects.get_or_create(
-            index=self.index, slug=self.package_name)
-        return package
+        return self.index.get_package(self.package_name)
 
     @cached_property
     def package_name(self):
@@ -41,9 +38,7 @@ class IndexMixin(object):
 
     @cached_property
     def release(self):
-        release, created = models.Release.objects.get_or_create(
-            package=self.package, version=self.version)
-        return release
+        return self.package.get_release(self.version)
 
     @cached_property
     def platform(self):
@@ -51,11 +46,7 @@ class IndexMixin(object):
 
     @cached_property
     def build(self):
-        try:
-            return models.Build.objects.get(
-                platform=self.platform, release=self.release)
-        except models.Build.DoesNotExist:
-            return self.release.create_build(self.platform)
+        return self.release.get_build(self.platform)
 
 
 class DevelopmentIndexMixin(IndexMixin):
@@ -66,43 +57,72 @@ class DevelopmentIndexMixin(IndexMixin):
 
     @cached_property
     def platform(self):
-        # TODO: Get the platform from the request context
-        return models.Platform.objects.get(pk=1)
+        return models.Platform.objects.get(slug=self.kwargs['platform_slug'])
 
 
-class PackageInfo(DevelopmentIndexMixin, JSONView):
-
-    def replace_url(self, url):
-        url['url'] = self.request.build_absolute_uri(
-            reverse('index:download_release', kwargs={
-                'package_name': self.package_name,
-                'version': self.version,
-                'filename': url['filename'],
-            })
-        )
-
-    def replace_urls(self, payload):
-        for url in payload['urls']:
-            self.replace_url(url)
+class PackageInfoMixin(DevelopmentIndexMixin):
+    def process_package_info(self, payload):
         for version, releases in six.iteritems(payload['releases']):
-            for release in releases:
-                self.replace_url(release)
+            if releases:
+                release = self.package.get_release(
+                    version, self.package.get_best_release(releases))
+                build = release.get_build(self.platform)
+                payload['releases'][version] = [build.to_pypi_dict()]
+        # Process the `urls` section later so that we already got the
+        # correct build created
+        version = payload['info']['version']
+        payload['urls'] = payload['releases'][version]
         return payload
 
+
+class PackageInfo(PackageInfoMixin, JSONView):
     def get_data(self, request, *args, **kwargs):
-        return self.replace_urls(
+        return self.process_package_info(
             self.index.get_package_details(self.package_name, self.version))
 
 
-class PackageLinks(DevelopmentIndexMixin, TemplateView):
+class AllPackageLinks(PackageInfoMixin, TemplateView):
+    template_name = 'index/all-simple.html'
+
+    def get_context_data(self, **kwargs):
+        context = super(AllPackageLinks, self).get_context_data(**kwargs)
+        context['platform'] = self.platform
+        context['index'] = self.index
+        context['builds'] = (
+            models.Build.objects.filter(
+                platform=self.platform,
+                release__package__index=self.index,
+            )
+            .select_related('release', 'platform', 'release__package')
+        )
+        return context
+
+
+class PackageLinks(PackageInfoMixin, TemplateView):
     template_name = 'index/simple.html'
 
     def get_context_data(self, **kwargs):
         context = super(PackageLinks, self).get_context_data(**kwargs)
-        context['details'] = self.index.get_package_details(self.package_name)
+        context['details'] = self.process_package_info(
+            self.index.get_package_details(self.package_name))
         return context
 
 
-class BuildView(DevelopmentIndexMixin, RedirectView):
+class DirectBuildGetterMixin(object):
+    @cached_property
+    def build(self):
+        try:
+            # NOTE: If the build id is available and a build exists, avoid
+            # to query the whole hierarchy and return as fast as possible.
+            return models.Build.objects.get(pk=self.kwargs['build_id'])
+        except (KeyError, models.Build.DoesNotExist):
+            return super(DirectBuildGetterMixin, self).build
+
+
+class BuildView(DirectBuildGetterMixin,
+                DevelopmentIndexMixin,
+                RedirectView):
+    permanent = False
+
     def get_redirect_url(self, *args, **kwargs):
-        return self.build.get_build_url()
+        return self.build.get_build_url(build_if_needed=True)

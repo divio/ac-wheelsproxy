@@ -1,0 +1,13 @@
+<html>
+    <head>
+        <title>All packages</title>
+        <meta name="api-version" value="2" />
+    </head>
+    <body>
+        <h1>Links for "{{ platform.slug }}" on "{{ index.slug }}"</h1>
+        {% for build in builds.all %}
+            <a href="{{ build.get_absolute_url }}#md5={{ build.md5_digest|default:build.release.original_details.md5_digest }}" rel="internal">{{ build.filename }}</a><br />
+        {% endfor %}
+    </body>
+</html>
+

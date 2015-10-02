@@ -50,6 +50,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'wsgi.application'
 
+MEDIA_ROOT = '/Users/garetjax/workspace/aldryn/development/sites/data/wheels-proxy/builds'
+MEDIA_URL = '/media/'
+
 load_django_settings(EnvConfig(), locals())
 
 

@@ -15,6 +15,7 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'celery_app',
     'index',
 )
 
@@ -50,3 +51,6 @@ TEMPLATES = [
 WSGI_APPLICATION = 'wsgi.application'
 
 load_django_settings(EnvConfig(), locals())
+
+
+import celery_app.app  # NOQA

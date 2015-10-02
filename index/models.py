@@ -5,12 +5,19 @@ import requests
 import jsonfield
 
 from django.db import models
+from django.core.cache import cache
 from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext_lazy as _
 
 from . import storage, tasks, builder
 
 
+def cache_call(key, func, timeout):
+    value = cache.get(key)
+    if not value:
+        value = func()
+        cache.set(key, value, timeout)
+    return value
 
 
 class Platform(models.Model):
@@ -33,6 +40,8 @@ class Platform(models.Model):
 
 
 class BackingIndex(models.Model):
+    cache_timeout = 60 * 2
+
     slug = models.SlugField(unique=True)
     url = models.URLField()
 
@@ -48,9 +57,24 @@ class BackingIndex(models.Model):
 
     def get_package_details(self, package_name, version=None):
         url = self.get_package_details_url(package_name, version)
-        response = requests.get(url)
-        assert response.status_code < 300
-        return response.json()
+        cache_key = 'package-details+{}'.format(url)
+
+        def get_details():
+            response = requests.get(url)
+            if response.status_code >= 300:
+                print response.content  # TODO: Log correctly
+                raise RuntimeError('Invalid response from index: {}'
+                                   .format(response.status_code))
+            return response.json()
+
+        # TODO: Use mirroring instead of caching as this allows to always have
+        # up to date information locally. The speedup of caching/mirroring
+        # compared to just proxying requests is about 50x.
+        # https://www.python.org/dev/peps/pep-0381/#the-mirroring-protocol
+        # https://pypi.python.org/pypi/bandersnatch
+        # https://bitbucket.org/pypa/bandersnatch/src
+        # https://bitbucket.org/loewis/pep381client/src
+        return cache_call(cache_key, get_details, self.cache_timeout)
 
     def get_package(self, package_name):
         package, created = Package.objects.get_or_create(

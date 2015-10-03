@@ -1,23 +1,21 @@
 import os
 
+from six.moves import xmlrpc_client
 import requests
-
 import jsonfield
 
 from django.db import models
 from django.core.cache import cache
 from django.core.urlresolvers import reverse
+from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
+from django.utils.functional import cached_property
 
 from . import storage, tasks, builder
 
 
-def cache_call(key, func, timeout):
-    value = cache.get(key)
-    if not value:
-        value = func()
-        cache.set(key, value, timeout)
-    return value
+class PackageNotFound(Exception):
+    pass
 
 
 class Platform(models.Model):
@@ -34,19 +32,26 @@ class Platform(models.Model):
         return self.slug
 
     def get_builder(self):
-        # TODO: If we need to support more platform types here (e.g. VM based)
+        # TODO: If we need to support more platform types here (e.g. use VMs
+        # for platforms not supported by docker: OS X, Windows, ...)
         assert self.type == self.DOCKER
         return builder.DockerBuilder(self.spec)
 
 
 class BackingIndex(models.Model):
-    cache_timeout = 60 * 2
-
     slug = models.SlugField(unique=True)
     url = models.URLField()
+    last_update_serial = models.BigIntegerField(null=True, blank=True)
 
     def __str__(self):
         return self.slug
+
+    def get_client(self):
+        return xmlrpc_client.ServerProxy(self.url)
+
+    @cached_property
+    def client(self):
+        return self.get_client()
 
     def get_package_details_url(self, package_name, version=None):
         url = '{}/{}'.format(self.url.rstrip('/'), package_name)
@@ -55,26 +60,18 @@ class BackingIndex(models.Model):
         url = '{}/{}'.format(url, 'json')
         return url
 
-    def get_package_details(self, package_name, version=None):
+    def get_package_details(self, package_name, version=None, session=None):
         url = self.get_package_details_url(package_name, version)
-        cache_key = 'package-details+{}'.format(url)
-
-        def get_details():
-            response = requests.get(url)
-            if response.status_code >= 300:
-                print response.content  # TODO: Log correctly
-                raise RuntimeError('Invalid response from index: {}'
-                                   .format(response.status_code))
-            return response.json()
-
-        # TODO: Use mirroring instead of caching as this allows to always have
-        # up to date information locally. The speedup of caching/mirroring
-        # compared to just proxying requests is about 50x.
-        # https://www.python.org/dev/peps/pep-0381/#the-mirroring-protocol
-        # https://pypi.python.org/pypi/bandersnatch
-        # https://bitbucket.org/pypa/bandersnatch/src
-        # https://bitbucket.org/loewis/pep381client/src
-        return cache_call(cache_key, get_details, self.cache_timeout)
+        if not session:
+            session = requests
+        response = session.get(url)
+        if response.status_code == 404:
+            raise PackageNotFound()
+        if response.status_code >= 300:
+            # TODO: Log content somewhere
+            raise RuntimeError('Invalid response from index: {}'
+                               .format(response.status_code))
+        return response.json()
 
     def get_package(self, package_name):
         package, created = Package.objects.get_or_create(
@@ -83,11 +80,12 @@ class BackingIndex(models.Model):
 
 
 class Package(models.Model):
-    slug = models.SlugField()
+    slug = models.SlugField(max_length=200)
     index = models.ForeignKey(BackingIndex)
 
     class Meta:
         unique_together = ('slug', 'index')
+        ordering = ('slug', )
 
     def __str__(self):
         return self.slug
@@ -96,7 +94,8 @@ class Package(models.Model):
         for release in releases:
             if release['packagetype'] == 'sdist':
                 return release
-            elif release['packagetype'] == 'bdist_wheel':
+        for release in releases:
+            if release['packagetype'] == 'bdist_wheel':
                 if release['filename'].endswith('-py2.py3-none-any.whl'):
                     return release
 
@@ -112,16 +111,37 @@ class Package(models.Model):
                 release.original_details = self.get_best_release(releases)
             assert release.original_details
             release.save()
+        elif details:
+            release.original_details = details
+            release.save()
         return release
+
+    @classmethod
+    def get_cache_key(cls, namespace, index_slug, platform_slug, package_name):
+        return '{}-index:{}-platform:{}-package:{}'.format(
+            namespace, index_slug, platform_slug, package_name)
+
+    def expire_cache(self, platform):
+        for namespace in ('links',):
+            key = self.get_cache_key(
+                namespace,
+                self.index.slug,
+                platform.slug,
+                self.slug,
+            )
+            if cache.has_key(key):
+                cache.delete(key)
 
 
 class Release(models.Model):
     package = models.ForeignKey(Package)
-    version = models.CharField(max_length=32)
+    version = models.CharField(max_length=200)
     original_details = jsonfield.JSONField()
+    last_update = models.DateTimeField(auto_now=True)
 
     class Meta:
         unique_together = ('package', 'version')
+        ordering = ('package', 'version')
 
     def __str__(self):
         return '{}-{}'.format(self.package.slug, self.version)
@@ -142,6 +162,16 @@ def upload_build_to(self, filename):
     )
 
 
+class BuildsManager(models.Manager):
+    use_for_related_fields = True
+
+    def get_queryset(self, *args, **kwargs):
+        return (super(BuildsManager, self)
+                .get_queryset(*args, **kwargs)
+                .defer('build_log')
+                .select_related('release__package__index'))
+
+
 class Build(models.Model):
     release = models.ForeignKey(Release)
     platform = models.ForeignKey(Platform)
@@ -149,13 +179,12 @@ class Build(models.Model):
     build = models.FileField(storage=storage.builds_storage,
                              upload_to=upload_build_to,
                              blank=True, null=True)
+    filesize = models.PositiveIntegerField(blank=True, null=True)
+    build_timestamp = models.DateTimeField(blank=True, null=True)
+    build_duration = models.PositiveIntegerField(blank=True, null=True)
+    build_log = models.TextField(blank=True)
 
-    # TODO: Add fields for:
-    # - Downloads
-    # - Build timestsamp
-    # - Build time
-    # - Build logs
-    # - Filesize
+    objects = BuildsManager()
 
     class Meta:
         unique_together = ('release', 'platform')
@@ -166,12 +195,13 @@ class Build(models.Model):
     def rebuild(self):
         builder = self.platform.get_builder()
         builder(self)
+        self.release.package.expire_cache(self.platform)
 
     def schedule_build(self, force=False):
         return tasks.build.delay(self.pk, force=force)
 
     def get_build_url(self, build_if_needed=False):
-        if self.build:
+        if self.is_built():
             return self.build.url
         else:
             if build_if_needed:
@@ -180,7 +210,7 @@ class Build(models.Model):
 
     @property
     def filename(self):
-        if self.build:
+        if self.is_built():
             path = self.build.name
         else:
             path = self.original_url
@@ -193,17 +223,21 @@ class Build(models.Model):
         except TypeError:
             return ''
 
+    def is_built(self):
+        return bool(self.build)
+
     def get_absolute_url(self):
-        if self.build:
+        if self.is_built() and not settings.ALWAYS_REDIRECT_DOWNLOADS:
             # NOTE: Return the final URL directly if the build is already
-            # available, so that we can avoid one additional request to get the
-            # redirect. This prevents us from collecting stats about package
-            # activity, but given the problems we're trying to solve with the
-            # proxy, this is an acceptable compromise.
-            # TODO: Make this behaviour configurable with a settings directive.
+            # available and ALWAYS_REDIRECT_DOWNLOADS is set to False, so that
+            # we can avoid one additional request to get the redirect.
+            # This prevents us from collecting stats about package activity,
+            # but given the problems we're trying to solve with the proxy,
+            # this is an acceptable compromise.
             return self.get_build_url()
         else:
             return reverse('index:download_build', kwargs={
+                'index_slug': self.release.package.index.slug,
                 'platform_slug': self.platform.slug,
                 'version': self.release.version,
                 'package_name': self.release.package.slug,
@@ -211,19 +245,21 @@ class Build(models.Model):
                 'build_id': self.pk,
             })
 
+    def get_digest(self):
+        if self.is_built():
+            return self.md5_digest
+        else:
+            return self.release.original_details['md5_digest']
+
     def to_pypi_dict(self):
         details = self.release.original_details
-        if self.build:
+        if self.is_built():
             # TODO: Provide these values
-            # details['upload_time']
             # details['python_version']
-            # details['downloads']
-            # details['size']
+            details['upload_time'] = self.build_timestamp
+            details['size'] = self.filesize
             details['filename'] = self.filename
             details['packagetype'] = 'bdist_wheel'
             details['md5_digest'] = self.md5_digest
-            # NOTE: Ignored fields
-            # details['has_sig']
-            # details['comment_text']
         details['url'] = self.get_absolute_url()
         return details

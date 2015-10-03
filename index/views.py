@@ -3,6 +3,7 @@ import json
 import six
 
 from django.http import HttpResponse
+from django.core.cache import cache
 from django.views.generic import RedirectView, View, TemplateView
 from django.utils.text import slugify
 from django.utils.functional import cached_property
@@ -52,15 +53,25 @@ class IndexMixin(object):
 class DevelopmentIndexMixin(IndexMixin):
     @cached_property
     def index(self):
-        # TODO: Get the index from the request context
-        return models.BackingIndex.objects.get(pk=1)
+        return models.BackingIndex.objects.get(slug=self.kwargs['index_slug'])
 
     @cached_property
     def platform(self):
         return models.Platform.objects.get(slug=self.kwargs['platform_slug'])
 
 
-class PackageInfoMixin(DevelopmentIndexMixin):
+class DirectBuildGetterMixin(object):
+    @cached_property
+    def build(self):
+        try:
+            # NOTE: If the build id is available and a build exists, avoid
+            # to query the whole hierarchy and return as fast as possible.
+            return models.Build.objects.get(pk=self.kwargs['build_id'])
+        except (KeyError, models.Build.DoesNotExist):
+            return super(DirectBuildGetterMixin, self).build
+
+
+class PackageInfo(DevelopmentIndexMixin, JSONView):
     def process_package_info(self, payload):
         for version, releases in six.iteritems(payload['releases']):
             if releases:
@@ -74,49 +85,38 @@ class PackageInfoMixin(DevelopmentIndexMixin):
         payload['urls'] = payload['releases'][version]
         return payload
 
-
-class PackageInfo(PackageInfoMixin, JSONView):
     def get_data(self, request, *args, **kwargs):
         return self.process_package_info(
             self.index.get_package_details(self.package_name, self.version))
 
 
-class AllPackageLinks(PackageInfoMixin, TemplateView):
-    template_name = 'index/all-simple.html'
-
-    def get_context_data(self, **kwargs):
-        context = super(AllPackageLinks, self).get_context_data(**kwargs)
-        context['platform'] = self.platform
-        context['index'] = self.index
-        context['builds'] = (
-            models.Build.objects.filter(
-                platform=self.platform,
-                release__package__index=self.index,
-            )
-            .select_related('release', 'platform', 'release__package')
-        )
-        return context
-
-
-class PackageLinks(PackageInfoMixin, TemplateView):
+class PackageLinks(DevelopmentIndexMixin, TemplateView):
     template_name = 'index/simple.html'
+
+    def get(self, request, *args, **kwargs):
+        cache_key = models.Package.get_cache_key(
+            'links',
+            self.kwargs['index_slug'],
+            self.kwargs['platform_slug'],
+            self.kwargs['package_name'],
+        )
+        response = cache.get(cache_key)
+        if not response:
+            response = super(PackageLinks, self).get(request, *args, **kwargs)
+            if hasattr(response, 'render') and callable(response.render):
+                response.render()
+            cache.set(cache_key, response, timeout=None)
+        return response
 
     def get_context_data(self, **kwargs):
         context = super(PackageLinks, self).get_context_data(**kwargs)
-        context['details'] = self.process_package_info(
-            self.index.get_package_details(self.package_name))
+        context['package'] = self.package
+        context['platform'] = self.platform
+        context['builds'] = models.Build.objects.filter(
+            release__package=self.package,
+            platform=self.platform,
+        ).order_by('-release__version')
         return context
-
-
-class DirectBuildGetterMixin(object):
-    @cached_property
-    def build(self):
-        try:
-            # NOTE: If the build id is available and a build exists, avoid
-            # to query the whole hierarchy and return as fast as possible.
-            return models.Build.objects.get(pk=self.kwargs['build_id'])
-        except (KeyError, models.Build.DoesNotExist):
-            return super(DirectBuildGetterMixin, self).build
 
 
 class BuildView(DirectBuildGetterMixin,

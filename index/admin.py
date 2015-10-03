@@ -9,9 +9,9 @@ admin.site.register(models.BackingIndex, BackingIndexAdmin)
 
 
 class PackageAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('slug',)
 
-admin.site.register(models.Package)
+admin.site.register(models.Package, PackageAdmin)
 
 
 admin.site.register(models.Release)

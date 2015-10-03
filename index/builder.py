@@ -3,14 +3,15 @@ import contextlib
 from tempfile import mkdtemp
 import shutil
 import hashlib
+import io
 
 from six.moves import urllib, shlex_quote
 
 from docker import Client, tls
-from docker.utils import create_host_config
 
 from django.conf import settings
 from django.core.files import File
+from django.utils import timezone
 
 
 @contextlib.contextmanager
@@ -65,28 +66,37 @@ class DockerBuilder(object):
         ])
 
         with tempdir(dir=settings.TEMP_BUILD_ROOT) as wheelhouse:
-            print wheelhouse
             container = self.client.create_container(
                 self.image,
                 cmd,
                 working_dir='/',
                 volumes=['/wheelhouse'],
-                host_config=create_host_config(binds={
+                host_config=self.client.create_host_config(binds={
                     wheelhouse: {
                         'bind': '/wheelhouse',
                         'ro': False,
                     }
                 }),
             )
+
+            build_start = timezone.now()
             self.client.start(container=container['Id'])
+            build_log = io.StringIO()
             for s in self.client.attach(container=container['Id'],
                                         stdout=True, stderr=True, stream=True):
-                print s
-            filename = os.listdir(wheelhouse)[0]
-            print filename
+                build_log.write(s.decode('utf8'))
+            build_duration = timezone.now() - build_start
+
+            filenames = os.listdir(wheelhouse)
+            assert len(filenames) == 1
+            filename = filenames[0]
             with open(os.path.join(wheelhouse, filename), 'rb') as fh:
                 digest = file_digest(hashlib.md5, fh)
                 build.build.save(filename, File(fh))
 
+        build.build_duration = build_duration.seconds
+        build.build_log = build_log.getvalue()
+        build.build_timestamp = timezone.now()
         build.md5_digest = digest
+        build.filesize = build.build.size
         build.save()

@@ -4,9 +4,10 @@ import six
 
 from django.http import HttpResponse
 from django.core.cache import cache
-from django.views.generic import RedirectView, View, TemplateView
 from django.utils.text import slugify
+from django.views.generic import RedirectView, View, TemplateView
 from django.utils.functional import cached_property
+from django.shortcuts import get_object_or_404, redirect
 
 from . import models
 
@@ -27,11 +28,16 @@ class IndexMixin(object):
 
     @cached_property
     def package(self):
-        return self.index.get_package(self.package_name)
+        # TODO: Redirect if the package.name does not match self.package_name
+        return get_object_or_404(
+            models.Package,
+            index=self.index,
+            slug=models.normalize_package_name(self.package_name),
+        )
 
     @cached_property
     def package_name(self):
-        return slugify(self.kwargs['package_name'])
+        return self.kwargs['package_name']
 
     @cached_property
     def version(self):
@@ -98,10 +104,17 @@ class PackageLinks(DevelopmentIndexMixin, TemplateView):
             'links',
             slugify(self.kwargs['index_slug']),
             slugify(self.kwargs['platform_slug']),
-            slugify(self.kwargs['package_name']),
+            models.normalize_package_name(self.kwargs['package_name']),
         )
         response = cache.get(cache_key)
         if not response:
+            if self.package.name != self.kwargs['package_name']:
+                return redirect(
+                    'index:package_links', permanent=True,
+                    index_slug=self.kwargs['index_slug'],
+                    platform_slug=self.kwargs['platform_slug'],
+                    package_name=self.package.name,
+                )
             response = super(PackageLinks, self).get(request, *args, **kwargs)
             if hasattr(response, 'render') and callable(response.render):
                 response.render()
@@ -111,6 +124,7 @@ class PackageLinks(DevelopmentIndexMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super(PackageLinks, self).get_context_data(**kwargs)
         context['package'] = self.package
+        context['index'] = self.index
         context['platform'] = self.platform
         context['builds'] = self.package.get_builds(self.platform)
         return context

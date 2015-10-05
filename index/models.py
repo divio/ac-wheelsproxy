@@ -1,6 +1,8 @@
 import os
 import logging
+import re
 
+import six
 from six.moves import xmlrpc_client
 import requests
 import jsonfield
@@ -16,6 +18,10 @@ from . import storage, tasks, builder
 
 
 log = logging.getLogger(__name__)
+
+
+def normalize_package_name(package_name):
+    return re.sub(r'(\.|-|_)+', '-', package_name.lower())
 
 
 class PackageNotFound(Exception):
@@ -80,13 +86,61 @@ class BackingIndex(models.Model):
         return response.json()
 
     def get_package(self, package_name):
+        normalized_package_name = normalize_package_name(package_name)
         package, created = Package.objects.get_or_create(
-            index=self, slug=package_name)
+            index=self, slug=normalized_package_name,
+            defaults={'name': package_name})
         return package
+
+    def _unsynced_events(self):
+        return self.client.changelog_since_serial(self.last_update_serial)
+
+    def sync(self):
+        session = requests.Session()
+        events = self._unsynced_events()
+        while events:
+            for event in events:
+                package_name, _, _, _, self.last_update_serial = event
+                if not self.import_package(package_name, session):
+                    # Nothing imported: remove the package
+                    Package.objects.filter(
+                         index=self,
+                         slug=normalize_package_name(package_name),
+                    ).delete()
+            events = self._unsynced_events()
+        self.save(update_fields=['last_update_serial'])
+
+    def import_package(self, package_name, session=None):
+        # log.info('importing {} from {}'.format(package_name, self.url))
+        try:
+            payload = self.get_package_details(package_name, session=session)
+        except PackageNotFound:
+            log.debug('package {} not found on {}'
+                      .format(package_name, self.url))
+            return
+        versions = payload['releases']
+        if not versions:
+            log.debug('no versions found for package {} on {}'
+                      .format(package_name, self.url))
+            return
+        package = self.get_package(payload['info']['name'])
+        release_ids = []
+        for version, releases in six.iteritems(versions):
+            release_details = package.get_best_release(releases)
+            if not release_details:
+                continue
+            release = package.get_release(version, release_details)
+            release_ids.append(release.pk)
+        if release_ids:
+            # Remove outdated releases
+            package.release_set.exclude(pk__in=release_ids).delete()
+        package.expire_cache()
+        return package.pk if release_ids else None
 
 
 class Package(models.Model):
-    slug = models.SlugField(max_length=200)
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255)
     index = models.ForeignKey(BackingIndex)
 
     class Meta:

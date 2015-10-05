@@ -8,5 +8,10 @@
         {% for build in builds.all %}
             <a href="{{ build.get_absolute_url }}#md5={{ build.get_digest }}" rel="internal">{{ build.filename }}</a><br />
         {% endfor %}
+        <!--
+            Platform: {{ platform.slug }} ({{ platform.pk }})
+            Index:    {{ index.slug }} ({{ index.url }})
+            Package:  {{ package.slug }} ({{ package.pk }})
+        -->
     </body>
 </html>

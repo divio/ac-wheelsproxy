@@ -137,6 +137,22 @@ class Package(models.Model):
                 if cache.has_key(key):
                     cache.delete(key)
 
+    def get_builds(self, platform, check=True):
+        releases = (Release.objects
+                    .filter(package=self)
+                    .only('pk')
+                    .all())
+        builds_qs = (Build.objects
+                     .filter(release__in=releases, platform=platform)
+                     .order_by('-release__version')
+                     .all())
+
+        if check and (len(builds_qs) != len(releases)):
+            for r in releases:
+                r.get_build(platform)
+
+        return builds_qs
+
 
 class Release(models.Model):
     package = models.ForeignKey(Package)

@@ -58,8 +58,8 @@ def command(initial, index):
     last_serial = index.last_update_serial
 
     if not last_serial or initial:
-        chunk_size = 150  # Number of packages to update per task
-        concurrency = 30  # Number of concurrent tasks
+        chunk_size = 100  # Number of packages to update per task
+        concurrency = 20  # Number of concurrent tasks
 
         # As we are syncing everything, get the current serial
         last_serial = index.client.changelog_last_serial()
@@ -93,7 +93,7 @@ def command(initial, index):
 
         click.secho('Removing {} outdated packages...'
                     .format(len(all_package_ids)), fg='yellow')
-        index.package_set.exclude(pk__in=all_package_ids).delete()
+        index.package_set.filter(pk__in=all_package_ids).delete()
 
     # Sync everything since the last serial, also when initial == True, as
     # something might have changed in the meantime...

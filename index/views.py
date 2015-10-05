@@ -112,10 +112,7 @@ class PackageLinks(DevelopmentIndexMixin, TemplateView):
         context = super(PackageLinks, self).get_context_data(**kwargs)
         context['package'] = self.package
         context['platform'] = self.platform
-        context['builds'] = models.Build.objects.filter(
-            release__package=self.package,
-            platform=self.platform,
-        ).order_by('-release__version')
+        context['builds'] = self.package.get_builds(self.platform)
         return context
 
 

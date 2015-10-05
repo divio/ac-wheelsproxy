@@ -1,6 +1,8 @@
 import os
 import logging
+import re
 
+import six
 from six.moves import xmlrpc_client
 import requests
 import jsonfield
@@ -16,6 +18,10 @@ from . import storage, tasks, builder
 
 
 log = logging.getLogger(__name__)
+
+
+def normalize_package_name(package_name):
+    return re.sub(r'(\.|-|_)+', '-', package_name.lower())
 
 
 class PackageNotFound(Exception):
@@ -80,8 +86,10 @@ class BackingIndex(models.Model):
         return response.json()
 
     def get_package(self, package_name):
+        normalized_package_name = normalize_package_name(package_name)
         package, created = Package.objects.get_or_create(
-            index=self, slug=package_name)
+            index=self, slug=normalized_package_name,
+            defaults={'name': package_name})
         return package
 
     def _unsynced_events(self):
@@ -131,7 +139,8 @@ class BackingIndex(models.Model):
 
 
 class Package(models.Model):
-    slug = models.SlugField(max_length=200)
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(max_length=255)
     index = models.ForeignKey(BackingIndex)
 
     class Meta:

@@ -96,9 +96,9 @@ class PackageLinks(DevelopmentIndexMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         cache_key = models.Package.get_cache_key(
             'links',
-            self.kwargs['index_slug'],
-            self.kwargs['platform_slug'],
-            self.kwargs['package_name'],
+            slugify(self.kwargs['index_slug']),
+            slugify(self.kwargs['platform_slug']),
+            slugify(self.kwargs['package_name']),
         )
         response = cache.get(cache_key)
         if not response:

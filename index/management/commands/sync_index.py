@@ -1,5 +1,4 @@
 import itertools
-import collections
 
 import six
 from six.moves import zip as iterzip
@@ -8,47 +7,7 @@ import djclick as click
 
 from django.utils.text import slugify
 
-from ... import models, tasks
-
-
-def bounded_submitter(task, size, args_iter):
-    results = collections.deque()
-
-    for i in range(size):
-        try:
-            args = next(args_iter)
-        except StopIteration:
-            break
-        else:
-            results.append(task.delay(*args))
-
-    while results:
-        res = results.popleft().get()
-        try:
-            args = next(args_iter)
-        except StopIteration:
-            break
-        else:
-            results.append(task.delay(*args))
-        yield res
-
-    while results:
-        res = results.popleft().get()
-        yield res
-
-
-def iter_chunks(iterable, size):
-    iterable = iter(iterable)
-    while True:
-        res = []
-        for i in range(size):
-            try:
-                res.append(next(iterable))
-            except StopIteration:
-                break
-        if not res:
-            break
-        yield res
+from ... import models, tasks, utils
 
 
 @click.command()
@@ -63,22 +22,26 @@ def command(initial, index):
         chunk_size = 100  # Number of packages to update per task
         concurrency = 20  # Number of concurrent tasks
 
-        # As we are syncing everything, get the current serial
+        # As we are syncing everything, get the current serial.
         last_serial = index.client.changelog_last_serial()
 
+        # Get the set of all existing packages. We will discard IDs of updated
+        # packages from it and then remove all the remaining packages.
         all_package_ids = set(index.package_set.values_list('id', flat=True))
 
+        # Get all the names of the packages on the selected index.
         click.secho('Fetching list of packges from {}...'.format(index.url),
                     fg='yellow')
         all_packages = index.client.list_packages()
 
+        # Import all packages metadata in different chunks and tasks.
         click.secho('Importing {} packages...'.format(len(all_packages)),
                     fg='yellow')
         args = iterzip(
             itertools.repeat(index.pk),
-            iter_chunks((slugify(p) for p in all_packages), chunk_size),
+            utils.iter_chunks((slugify(p) for p in all_packages), chunk_size),
         )
-        results_iterator = bounded_submitter(
+        results_iterator = utils.bounded_submitter(
             tasks.import_packages,
             concurrency,
             args,
@@ -93,6 +56,8 @@ def command(initial, index):
                         click.secho('Failed to import {} ({})'.format(k, v),
                                     fg='red')
 
+        # Remove the set of not-updated (i.e. not found on the index anymore)
+        # packages from the database.
         click.secho('Removing {} outdated packages...'
                     .format(len(all_package_ids)), fg='yellow')
         index.package_set.filter(pk__in=all_package_ids).delete()
@@ -101,6 +66,7 @@ def command(initial, index):
     # something might have changed in the meantime...
     for event in index.client.changelog_since_serial(last_serial):
         # TODO: Take action
+        # package_name, _, _, action, last_serial = event
         print event
 
     index.last_update_serial = last_serial

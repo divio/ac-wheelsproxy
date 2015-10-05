@@ -48,6 +48,20 @@ def file_digest(algorithm, fh, chunk_size=4096):
     return hash.hexdigest()
 
 
+def consume_output(stream, fh, encoding='utf-8'):
+    for chunk in stream:
+        fh.write(chunk.decode(encoding))
+
+
+def split_image_name(name):
+    image_tag = name.rsplit(':', 1)
+    if len(image_tag) == 2:
+        image, tag = image_tag
+    else:
+        image, tag = image_tag, None
+    return image, tag
+
+
 class DockerBuilder(object):
     def __init__(self, platform_spec):
         self.image = platform_spec['image']
@@ -65,7 +79,17 @@ class DockerBuilder(object):
             shlex_quote(build.original_url),
         ])
 
+        build_log = io.StringIO()
+
         with tempdir(dir=settings.TEMP_BUILD_ROOT) as wheelhouse:
+            image, tag = split_image_name(self.image)
+            consume_output(
+                # TODO: Add support for custom/insecure registries and
+                # auth_config
+                self.client.pull(image, tag, stream=True),
+                build_log,
+            )
+
             container = self.client.create_container(
                 self.image,
                 cmd,
@@ -81,10 +105,11 @@ class DockerBuilder(object):
 
             build_start = timezone.now()
             self.client.start(container=container['Id'])
-            build_log = io.StringIO()
-            for s in self.client.attach(container=container['Id'],
-                                        stdout=True, stderr=True, stream=True):
-                build_log.write(s.decode('utf8'))
+            consume_output(
+                self.client.attach(container=container['Id'],
+                                   stdout=True, stderr=True, stream=True),
+                build_log,
+            )
             build_duration = timezone.now() - build_start
 
             filenames = os.listdir(wheelhouse)

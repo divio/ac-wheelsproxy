@@ -1,5 +1,5 @@
 Django>=1.8,<1.9
-coolfig==0.3.0
+coolfig>=0.4.0
 django-environ
 psycopg2
 requests>=2.7,<3.0

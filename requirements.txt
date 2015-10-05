@@ -10,7 +10,7 @@ billiard==3.3.0.20         # via celery
 boto==2.38.0
 celery==3.1.18
 click==5.1                 # via django-click
-coolfig==0.3.0
+coolfig==0.4.0
 django-click==1.0.0
 django-environ==0.4.0
 django-redis==4.2.0

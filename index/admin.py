@@ -2,6 +2,12 @@ from django.contrib import admin
 from . import models
 
 
+class PlatformAdmin(admin.ModelAdmin):
+    pass
+
+admin.site.register(models.Platform, PlatformAdmin)
+
+
 class BackingIndexAdmin(admin.ModelAdmin):
     list_display = ('slug', 'url')
 
@@ -14,10 +20,12 @@ class PackageAdmin(admin.ModelAdmin):
 admin.site.register(models.Package, PackageAdmin)
 
 
-admin.site.register(models.Release)
+class ReleaseAdmin(admin.ModelAdmin):
+    raw_id_fields = (
+        'package',
+    )
 
-
-admin.site.register(models.Platform)
+admin.site.register(models.Release, ReleaseAdmin)
 
 
 class BuildAdmin(admin.ModelAdmin):
@@ -28,11 +36,15 @@ class BuildAdmin(admin.ModelAdmin):
         'is_built',
     )
 
+    raw_id_fields = (
+        'release',
+    )
+
     def platform_name(self, build):
         return build.platform.slug
 
     def package_name(self, build):
-        return build.release.package.slug
+        return build.release.package.name
 
     def version(self, build):
         return build.release.version

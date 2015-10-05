@@ -14,3 +14,7 @@ class AppSettings(Settings):
     BUILDS_STORAGE_ACCESS_KEY = Value(str)
     BUILDS_STORAGE_SECRET_KEY = Value(str)
     BUILDS_STORAGE_BUCKET_NAME = Value(str)
+    SECURE_SSL_REDIRECT = Value(boolean, default=False)
+    SESSION_COOKIE_SECURE = Value(boolean, default=False)
+    CSRF_COOKIE_SECURE = Value(boolean, default=False)
+    SECURE_HSTS_SECONDS = Value(int, default=0)

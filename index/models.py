@@ -1,4 +1,5 @@
 import os
+import logging
 
 from six.moves import xmlrpc_client
 import requests
@@ -12,6 +13,9 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils.functional import cached_property
 
 from . import storage, tasks, builder
+
+
+log = logging.getLogger(__name__)
 
 
 class PackageNotFound(Exception):
@@ -68,7 +72,9 @@ class BackingIndex(models.Model):
         if response.status_code == 404:
             raise PackageNotFound()
         if response.status_code >= 300:
-            # TODO: Log content somewhere
+            content = response.content
+            log.warning('Invalid response {} from index {} with content: {!r}'
+                        .format(response.status_code, self.url, content))
             raise RuntimeError('Invalid response from index: {}'
                                .format(response.status_code))
         return response.json()

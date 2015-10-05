@@ -121,16 +121,21 @@ class Package(models.Model):
         return '{}-index:{}-platform:{}-package:{}'.format(
             namespace, index_slug, platform_slug, package_name)
 
-    def expire_cache(self, platform):
-        for namespace in ('links',):
-            key = self.get_cache_key(
-                namespace,
-                self.index.slug,
-                platform.slug,
-                self.slug,
-            )
-            if cache.has_key(key):
-                cache.delete(key)
+    def expire_cache(self, platform=None):
+        if platform:
+            platforms = [platform]
+        else:
+            platforms = Platform.objects.all()
+        for platform in platforms:
+            for namespace in ('links',):
+                key = self.get_cache_key(
+                    namespace,
+                    self.index.slug,
+                    platform.slug,
+                    self.slug,
+                )
+                if cache.has_key(key):
+                    cache.delete(key)
 
 
 class Release(models.Model):

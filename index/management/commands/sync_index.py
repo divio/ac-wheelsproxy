@@ -5,8 +5,6 @@ from six.moves import zip as iterzip
 
 import djclick as click
 
-from django.utils.text import slugify
-
 from ... import models, tasks, utils
 
 
@@ -16,14 +14,13 @@ from ... import models, tasks, utils
 @click.argument('index')
 def command(initial, index):
     index = models.BackingIndex.objects.get(slug=index)
-    last_serial = index.last_update_serial
 
-    if not last_serial or initial:
-        chunk_size = 100  # Number of packages to update per task
-        concurrency = 20  # Number of concurrent tasks
+    if not index.last_update_serial or initial:
+        chunk_size = 150  # Number of packages to update per task
+        concurrency = 30  # Number of concurrent tasks
 
         # As we are syncing everything, get the current serial.
-        last_serial = index.client.changelog_last_serial()
+        index.last_update_serial = index.client.changelog_last_serial()
 
         # Get the set of all existing packages. We will discard IDs of updated
         # packages from it and then remove all the remaining packages.
@@ -39,7 +36,7 @@ def command(initial, index):
                     fg='yellow')
         args = iterzip(
             itertools.repeat(index.pk),
-            utils.iter_chunks((slugify(p) for p in all_packages), chunk_size),
+            utils.iter_chunks((p for p in all_packages), chunk_size),
         )
         results_iterator = utils.bounded_submitter(
             tasks.import_packages,
@@ -64,10 +61,4 @@ def command(initial, index):
 
     # Sync everything since the last serial, also when initial == True, as
     # something might have changed in the meantime...
-    for event in index.client.changelog_since_serial(last_serial):
-        # TODO: Take action
-        # package_name, _, _, action, last_serial = event
-        print event
-
-    index.last_update_serial = last_serial
-    index.save()
+    index.sync()

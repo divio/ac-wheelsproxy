@@ -44,3 +44,15 @@ def import_packages(index_id, package_names):
             else:
                 ignored.append(package_name)
     return succeded, ignored, failed
+
+
+@shared_task
+def sync_indexes():
+    from . import models
+    for index in models.BackingIndex.objects.all():
+        if not index.last_update_serial:
+            log.warning('Skipping index without intial sync "{}"'
+                        .format(index.slug))
+            continue
+        log.info('Syncing index "{}"'.format(index.slug))
+        index.sync()

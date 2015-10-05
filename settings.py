@@ -6,6 +6,7 @@ directives. Those are read from environment variables.
 """
 
 import sys
+from datetime import timedelta
 
 from coolfig import EnvConfig, load_django_settings
 
@@ -73,6 +74,16 @@ LOGGING = {
         'level': 'INFO'
     },
 }
+
+CELERYBEAT_SCHEDULE = {
+    'sync-all-indexes': {
+        'task': 'index.tasks.sync_indexes',
+        'schedule': timedelta(seconds=60),
+    },
+}
+
+CELERY_TIMEZONE = 'UTC'
+
 
 load_django_settings(EnvConfig(), locals())
 

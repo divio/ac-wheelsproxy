@@ -137,6 +137,23 @@ class BackingIndex(models.Model):
         package.expire_cache()
         return package.pk if release_ids else None
 
+    def expire_cache(self, platform=None):
+        if platform:
+            platforms = [platform]
+        else:
+            platforms = Platform.objects.all()
+        for slug in self.package_set.values_list('slug').all():
+            for platform in platforms:
+                for namespace in ('links',):
+                    key = Package.get_cache_key(
+                        namespace,
+                        self.slug,
+                        platform.slug,
+                        slug,
+                    )
+                    if cache.has_key(key):
+                        cache.delete(key)
+
 
 class Package(models.Model):
     name = models.CharField(max_length=255)

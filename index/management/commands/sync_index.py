@@ -27,17 +27,20 @@ def command(initial, index):
         all_package_ids = set(index.package_set.values_list('id', flat=True))
 
         # Get all the names of the packages on the selected index.
-        click.secho('Fetching list of packges from {}...'.format(index.url),
+        click.secho('Fetching list of packages from {}...'.format(index.url),
                     fg='yellow')
         all_packages = index.client.list_packages()
 
         # Import all packages metadata in different chunks and tasks.
         click.secho('Importing {} packages...'.format(len(all_packages)),
                     fg='yellow')
+        # Create a generator of (index.pk, all_packages[i:i+chunk_size]) tuples
         args = iterzip(
             itertools.repeat(index.pk),
-            utils.iter_chunks((p for p in all_packages), chunk_size),
+            utils.iter_chunks(all_packages, chunk_size),
         )
+        # Submit each tuple in args to the workers, but limit it to at most
+        # `concurrency` running tasks
         results_iterator = utils.bounded_submitter(
             tasks.import_packages,
             concurrency,
@@ -61,4 +64,5 @@ def command(initial, index):
 
     # Sync everything since the last serial, also when initial == True, as
     # something might have changed in the meantime...
+    click.secho('Syncing remaining updates...', fg='yellow')
     index.sync()

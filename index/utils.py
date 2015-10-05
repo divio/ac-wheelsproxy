@@ -20,7 +20,8 @@ def bounded_submitter(task, size, args_iter):
             break
         else:
             results.append(task.delay(*args))
-        yield res
+        finally:
+            yield res
 
     while results:
         res = results.popleft().get()

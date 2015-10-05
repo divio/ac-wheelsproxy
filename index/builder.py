@@ -3,14 +3,15 @@ import contextlib
 from tempfile import mkdtemp
 import shutil
 import hashlib
+import io
 
 from six.moves import urllib, shlex_quote
 
 from docker import Client, tls
-from docker.utils import create_host_config
 
 from django.conf import settings
 from django.core.files import File
+from django.utils import timezone
 
 
 @contextlib.contextmanager
@@ -47,6 +48,20 @@ def file_digest(algorithm, fh, chunk_size=4096):
     return hash.hexdigest()
 
 
+def consume_output(stream, fh, encoding='utf-8'):
+    for chunk in stream:
+        fh.write(chunk.decode(encoding))
+
+
+def split_image_name(name):
+    image_tag = name.rsplit(':', 1)
+    if len(image_tag) == 2:
+        image, tag = image_tag
+    else:
+        image, tag = image_tag, None
+    return image, tag
+
+
 class DockerBuilder(object):
     def __init__(self, platform_spec):
         self.image = platform_spec['image']
@@ -64,29 +79,49 @@ class DockerBuilder(object):
             shlex_quote(build.original_url),
         ])
 
+        build_log = io.StringIO()
+
         with tempdir(dir=settings.TEMP_BUILD_ROOT) as wheelhouse:
-            print wheelhouse
+            image, tag = split_image_name(self.image)
+            consume_output(
+                # TODO: Add support for custom/insecure registries and
+                # auth_config
+                self.client.pull(image, tag, stream=True),
+                build_log,
+            )
+
             container = self.client.create_container(
                 self.image,
                 cmd,
                 working_dir='/',
                 volumes=['/wheelhouse'],
-                host_config=create_host_config(binds={
+                host_config=self.client.create_host_config(binds={
                     wheelhouse: {
                         'bind': '/wheelhouse',
                         'ro': False,
                     }
                 }),
             )
+
+            build_start = timezone.now()
             self.client.start(container=container['Id'])
-            for s in self.client.attach(container=container['Id'],
-                                        stdout=True, stderr=True, stream=True):
-                print s
-            filename = os.listdir(wheelhouse)[0]
-            print filename
+            consume_output(
+                self.client.attach(container=container['Id'],
+                                   stdout=True, stderr=True, stream=True),
+                build_log,
+            )
+            build_duration = timezone.now() - build_start
+
+            filenames = os.listdir(wheelhouse)
+            assert len(filenames) == 1
+            filename = filenames[0]
             with open(os.path.join(wheelhouse, filename), 'rb') as fh:
                 digest = file_digest(hashlib.md5, fh)
                 build.build.save(filename, File(fh))
 
+        build.build_duration = build_duration.seconds
+        build.build_log = build_log.getvalue()
+        build.build_timestamp = timezone.now()
         build.md5_digest = digest
+        build.filesize = build.build.size
         build.save()

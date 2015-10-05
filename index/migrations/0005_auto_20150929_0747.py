@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='build',
             name='build',
-            field=models.FileField(storage=index.storage.OverwritingFileSystemStorage(), null=True, upload_to=index.models.upload_build_to, blank=True),
+            field=models.FileField(storage=index.storage.OverwritingS3Storage(), null=True, upload_to=index.models.upload_build_to, blank=True),
         ),
         migrations.AlterField(
             model_name='build',

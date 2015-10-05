@@ -9,9 +9,9 @@ admin.site.register(models.BackingIndex, BackingIndexAdmin)
 
 
 class PackageAdmin(admin.ModelAdmin):
-    pass
+    list_display = ('slug',)
 
-admin.site.register(models.Package)
+admin.site.register(models.Package, PackageAdmin)
 
 
 admin.site.register(models.Release)
@@ -25,6 +25,7 @@ class BuildAdmin(admin.ModelAdmin):
         'package_name',
         'version',
         'platform_name',
+        'is_built',
     )
 
     def platform_name(self, build):
@@ -35,5 +36,9 @@ class BuildAdmin(admin.ModelAdmin):
 
     def version(self, build):
         return build.release.version
+
+    def is_built(self, build):
+        return bool(build.build)
+    is_built.boolean = True
 
 admin.site.register(models.Build, BuildAdmin)

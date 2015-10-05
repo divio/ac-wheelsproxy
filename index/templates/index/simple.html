@@ -1,14 +1,12 @@
 <html>
     <head>
-        <title>Links for {{ details.info.name.lower }}</title>
+        <title>Links for {{ package.slug }}</title>
         <meta name="api-version" value="2" />
     </head>
     <body>
-        <h1>Links for {{ details.info.name.lower }}</h1>
-        {% for version, releases in details.releases.items %}
-            {% for release in releases %}
-                <a href="{% url "index:download_release" package_name=details.info.name version=version filename=release.filename %}#md5={{ release.md5_digest }}" rel="internal">{{ release.filename }}</a><br />
-            {% endfor %}
+        <h1>Links for {{ package.slug }}</h1>
+        {% for build in builds.all %}
+            <a href="{{ build.get_absolute_url }}#md5={{ build.get_digest }}" rel="internal">{{ build.filename }}</a><br />
         {% endfor %}
     </body>
 </html>

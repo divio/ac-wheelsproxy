@@ -5,7 +5,10 @@ This file contains only static values (app definition) and no configuration
 directives. Those are read from environment variables.
 """
 
+import sys
+
 from coolfig import EnvConfig, load_django_settings
+
 
 INSTALLED_APPS = (
     'django.contrib.admin',
@@ -56,6 +59,20 @@ WSGI_APPLICATION = 'wsgi.application'
 
 MEDIA_ROOT = '/Users/garetjax/workspace/aldryn/development/sites/data/wheels-proxy/builds'
 MEDIA_URL = '/media/'
+
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'stream': sys.stdout,
+        }
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO'
+    },
+}
 
 load_django_settings(EnvConfig(), locals())
 

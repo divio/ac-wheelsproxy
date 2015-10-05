@@ -1,8 +1,13 @@
+import logging
+
 import six
 
 import requests
 
 from celery import shared_task
+
+
+log = logging.getLogger(__name__)
 
 
 @shared_task
@@ -57,8 +62,10 @@ def import_packages(index_id, package_names):
         try:
             id = import_package(index, package_name, session)
         except Exception as e:
-            failed[package_name] = '{}.{}'.format(
-                e.__class__.__module__, e.__class__.__name__)
+            log.exception('Failed to import {} from {}'.format(
+                package_name, index.url))
+            failed[package_name] = '{}.{}: {}'.format(
+                e.__class__.__module__, e.__class__.__name__, str(e))
         else:
             if id:
                 succeded[package_name] = id

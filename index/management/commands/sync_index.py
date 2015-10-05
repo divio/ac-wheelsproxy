@@ -6,6 +6,8 @@ from six.moves import zip as iterzip
 
 import djclick as click
 
+from django.utils.text import slugify
+
 from ... import models, tasks
 
 
@@ -74,7 +76,7 @@ def command(initial, index):
                     fg='yellow')
         args = iterzip(
             itertools.repeat(index.pk),
-            iter_chunks(all_packages, chunk_size),
+            iter_chunks((slugify(p) for p in all_packages), chunk_size),
         )
         results_iterator = bounded_submitter(
             tasks.import_packages,
@@ -97,7 +99,9 @@ def command(initial, index):
 
     # Sync everything since the last serial, also when initial == True, as
     # something might have changed in the meantime...
-    print index.client.changelog_since_serial(last_serial)
+    for event in index.client.changelog_since_serial(last_serial):
+        # TODO: Take action
+        print event
 
     index.last_update_serial = last_serial
     index.save()

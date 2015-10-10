@@ -61,7 +61,7 @@ WSGI_APPLICATION = 'wsgi.application'
 MEDIA_ROOT = '/Users/garetjax/workspace/aldryn/development/sites/data/wheels-proxy/builds'
 MEDIA_URL = '/media/'
 
-STATIC_ROOT = ''
+STATIC_ROOT = '/static'
 STATIC_URL = '/static/'
 
 STATICFILES_FINDERS = (

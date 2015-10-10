@@ -6,4 +6,5 @@ RUN pip install --use-wheel --no-deps -r requirements.txt
 ADD ./ /app/
 EXPOSE 80
 ENV DJANGO_SETTINGS_MODULE settings
+RUN /app/manage.py collectstatic --noinput
 CMD start web

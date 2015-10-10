@@ -5,7 +5,7 @@ from . import views
 
 index_patterns = [
     # Simple PyPI API
-    url('^(?P<package_name>[a-zA-Z0-9_-]+)/$',
+    url('^(?P<package_name>[a-zA-Z0-9_\.-]+)/$',
         views.PackageLinks.as_view(), name='package_links'),
 
     # Download redirects

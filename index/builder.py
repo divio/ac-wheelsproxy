@@ -58,7 +58,7 @@ def split_image_name(name):
     if len(image_tag) == 2:
         image, tag = image_tag
     else:
-        image, tag = image_tag, None
+        image, tag = image_tag[0], None
     return image, tag
 
 

@@ -12,3 +12,5 @@ django-click
 django-storages
 boto
 raven
+uwsgi
+requests!=2.8.1,!=2.8.0

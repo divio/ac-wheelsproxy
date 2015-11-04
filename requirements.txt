@@ -6,24 +6,24 @@
 #
 amqp==1.4.7                # via kombu
 anyjson==0.3.3             # via kombu
-billiard==3.3.0.20         # via celery
+billiard==3.3.0.21         # via celery
 boto==2.38.0
-celery==3.1.18
+celery==3.1.19
 click==5.1                 # via django-click
 coolfig==0.4.0
 django-click==1.0.0
 django-environ==0.4.0
-django-redis==4.2.0
+django-redis==4.3.0
 django-storages==1.1.8
-django==1.8.5
-docker-py==1.4.0
+django==1.8.6
+docker-py==1.5.0
 jsonfield==1.0.3
-kombu==3.0.26              # via celery
-msgpack-python==0.4.6      # via django-redis
+kombu==3.0.29              # via celery
 psycopg2==2.6.1
-pytz==2015.6               # via celery
-raven==5.7.2
-redis==2.10.3
+pytz==2015.7               # via celery
+raven==5.8.1
+redis==2.10.5
 requests==2.7.0
-six==1.9.0                 # via coolfig, django-click, django-environ, docker-py, websocket-client
-websocket-client==0.32.0   # via docker-py
+six==1.10.0                # via coolfig, django-click, django-environ, docker-py, websocket-client
+uwsgi==2.0.11.2
+websocket-client==0.34.0   # via docker-py

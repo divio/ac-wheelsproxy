@@ -276,7 +276,7 @@ class Build(models.Model):
     md5_digest = models.CharField(max_length=32, default='', blank=True)
     build = models.FileField(storage=storage.builds_storage,
                              upload_to=upload_build_to,
-                             blank=True, null=True)
+                             max_length=255, blank=True, null=True)
     filesize = models.PositiveIntegerField(blank=True, null=True)
     build_timestamp = models.DateTimeField(blank=True, null=True)
     build_duration = models.PositiveIntegerField(blank=True, null=True)

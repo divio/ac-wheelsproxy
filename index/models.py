@@ -6,6 +6,7 @@ import six
 from six.moves import xmlrpc_client
 import requests
 import jsonfield
+from yurl import URL
 
 from django.db import models
 from django.core.cache import cache
@@ -300,7 +301,10 @@ class Build(models.Model):
 
     def get_build_url(self, build_if_needed=False):
         if self.is_built():
-            return self.build.url
+            url = self.build.url
+            # Workaround until https://github.com/boto/boto/pull/3470 is fixed
+            url = str(URL(url).replace(query=''))
+            return url
         else:
             if build_if_needed:
                 self.schedule_build()

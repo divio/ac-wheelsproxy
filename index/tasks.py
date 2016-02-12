@@ -8,7 +8,7 @@ from celery import shared_task
 log = logging.getLogger(__name__)
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def build(build_id, force=False):
     from . import models
 
@@ -46,7 +46,7 @@ def import_packages(index_id, package_names):
     return succeded, ignored, failed
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def sync_indexes():
     from . import models
     for index in models.BackingIndex.objects.all():

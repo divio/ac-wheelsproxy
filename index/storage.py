@@ -10,6 +10,7 @@ class OverwritingS3Storage(S3BotoStorage):
             access_key=settings.BUILDS_STORAGE_ACCESS_KEY,
             secret_key=settings.BUILDS_STORAGE_SECRET_KEY,
             bucket_name=settings.BUILDS_STORAGE_BUCKET_NAME,
+            host=settings.BUILDS_STORAGE_HOST,
             querystring_auth=False,
         )
 

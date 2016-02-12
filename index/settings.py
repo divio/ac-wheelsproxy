@@ -1,3 +1,5 @@
+from boto.s3.connection import S3Connection
+
 from coolfig import Settings, Value, Dictionary
 from coolfig.types import boolean
 
@@ -22,3 +24,4 @@ class AppSettings(Settings):
     BUILDS_STORAGE_ACCESS_KEY = Value(str)
     BUILDS_STORAGE_SECRET_KEY = Value(str)
     BUILDS_STORAGE_BUCKET_NAME = Value(str)
+    BUILDS_STORAGE_HOST = Value(str, default=S3Connection.DefaultHost)

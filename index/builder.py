@@ -109,8 +109,10 @@ class DockerBuilder(object):
                                    stdout=True, stderr=True, stream=True),
                 build_log,
             )
+            build_end = timezone.now()
+
             build.build_log = build_log.getvalue()
-            build.build_duration = timezone.now() - build_start
+            build.build_duration = (build_end - build_start).total_seconds()
             build.build_timestamp = timezone.now()
             build.save()
 

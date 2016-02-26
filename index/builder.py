@@ -79,8 +79,7 @@ class DockerBuilder(object):
             shlex_quote(build.original_url),
         ])
 
-        build_log_io = io.StringIO()
-        build_log = ''
+        build_log = io.StringIO()
 
         with tempdir(dir=settings.TEMP_BUILD_ROOT) as wheelhouse:
             image, tag = split_image_name(self.image)
@@ -88,7 +87,7 @@ class DockerBuilder(object):
                 # TODO: Add support for custom/insecure registries and
                 # auth_config
                 self.client.pull(image, tag, stream=True),
-                build_log_io,
+                build_log,
             )
 
             container = self.client.create_container(
@@ -109,21 +108,22 @@ class DockerBuilder(object):
             consume_output(
                 self.client.attach(container=container['Id'],
                                    stdout=True, stderr=True, stream=True),
-                build_log_io,
+                build_log,
             )
-            build_log = build_log_io.getvalue()
-            build_duration = timezone.now() - build_start
+            build.build_log = build_log.getvalue()
+            build.build_duration = timezone.now() - build_start
+            build.build_timestamp = timezone.now()
+            build.save()
 
             filenames = os.listdir(wheelhouse)
-            assert len(filenames) == 1
-            filename = filenames[0]
-            with open(os.path.join(wheelhouse, filename), 'rb') as fh:
-                digest = file_digest(hashlib.md5, fh)
-                build.build.save(filename, File(fh))
 
-        build.build_duration = build_duration.seconds
-        build.build_log = build_log
-        build.build_timestamp = timezone.now()
-        build.md5_digest = digest
-        build.filesize = build.build.size
-        build.save()
+            if filenames:
+                assert len(filenames) == 1
+                filename = filenames[0]
+                with open(os.path.join(wheelhouse, filename), 'rb') as fh:
+                    build.md5_digest = file_digest(hashlib.md5, fh)
+                    build.build.save(filename, File(fh))
+                    build.filesize = build.build.size
+                    build.save()
+            else:
+                raise RuntimeError('Build failed')

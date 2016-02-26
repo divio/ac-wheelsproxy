@@ -76,6 +76,7 @@ class DockerBuilder(object):
             '--no-deps',
             '--no-clean',
             '--no-index',
+            '--wheel-dir', '/wheelhouse',
             shlex_quote(build.original_url),
         ])
 

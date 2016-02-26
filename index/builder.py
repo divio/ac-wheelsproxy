@@ -84,8 +84,7 @@ class DockerBuilder(object):
         with tempdir(dir=settings.TEMP_BUILD_ROOT) as wheelhouse:
             image, tag = split_image_name(self.image)
             consume_output(
-                # TODO: Add support for custom/insecure registries and
-                # auth_config
+                # TODO: Add support for custom registries and auth_config
                 self.client.pull(image, tag, stream=True),
                 build_log,
             )

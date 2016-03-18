@@ -14,6 +14,7 @@ from django.core.urlresolvers import reverse
 from django.conf import settings
 from django.utils.translation import ugettext_lazy as _
 from django.utils.functional import cached_property
+from django.contrib.postgres.fields import JSONField
 
 from . import storage, tasks, builder
 
@@ -278,6 +279,7 @@ class Build(models.Model):
     build = models.FileField(storage=storage.builds_storage,
                              upload_to=upload_build_to,
                              max_length=255, blank=True, null=True)
+    metadata = JSONField(null=True, blank=True)
     filesize = models.PositiveIntegerField(blank=True, null=True)
     build_timestamp = models.DateTimeField(blank=True, null=True)
     build_duration = models.PositiveIntegerField(blank=True, null=True)

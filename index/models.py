@@ -93,6 +93,9 @@ class BackingIndex(models.Model):
             defaults={'name': package_name})
         return package
 
+    def last_upstream_serial(self):
+        return self.client.changelog_last_serial()
+
     def _unsynced_events(self):
         return self.client.changelog_since_serial(self.last_update_serial)
 

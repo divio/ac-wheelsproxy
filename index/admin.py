@@ -28,6 +28,18 @@ admin.site.register(models.Platform, PlatformAdmin)
 class BackingIndexAdmin(admin.ModelAdmin):
     list_display = ('slug', 'url')
 
+    readonly_fields = (
+        'formatted_last_upstream_serial',
+    )
+
+    def formatted_last_upstream_serial(self, instance):
+        upstream_serial = instance.last_upstream_serial()
+        return '{} ({} events to sync)'.format(
+            upstream_serial,
+            upstream_serial - instance.last_update_serial,
+        )
+    formatted_last_upstream_serial.short_description = 'last upstream serial'
+
 admin.site.register(models.BackingIndex, BackingIndexAdmin)
 
 

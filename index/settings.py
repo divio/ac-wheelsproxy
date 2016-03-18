@@ -7,7 +7,7 @@ from coolfig.types import boolean
 class AppSettings(Settings):
     ALWAYS_REDIRECT_DOWNLOADS = Value(boolean, default=False)
     DOCKER_BUILDER_ENDPOINT = Value(str)
-    DOCKER_BUILDER_CERTS = Value(str)
+    DOCKER_BUILDER_CERTS = Value(str, default=None)
     TEMP_BUILD_ROOT = Value(str, default='/tmp')
 
     SECURE_SSL_REDIRECT = Value(boolean, default=False)

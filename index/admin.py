@@ -109,6 +109,9 @@ class BuildAdmin(admin.ModelAdmin):
         'release__package__index',
     )
 
+    readonly_fields = (
+        'formatted_requirements',
+    )
 
     search_fields = ['release__package__name']
 
@@ -128,5 +131,13 @@ class BuildAdmin(admin.ModelAdmin):
     def is_built(self, build):
         return bool(build.build)
     is_built.boolean = True
+
+    def formatted_requirements(self, instance):
+        reqs = instance.requirements
+        if reqs is not None:
+            return '\n'.join(reqs)
+        else:
+            return 'n/d'
+    formatted_requirements.short_description = 'requirements'
 
 admin.site.register(models.Build, BuildAdmin)

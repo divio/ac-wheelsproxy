@@ -327,8 +327,16 @@ class Build(models.Model):
         except TypeError:
             return ''
 
+    @property
+    def requirements(self):
+        if self.metadata:
+            return self.metadata.get('run_requires')[0]['requires']
+        else:
+            return None
+
     def is_built(self):
         return bool(self.build)
+    is_built.boolean = True
 
     def get_absolute_url(self):
         if self.is_built() and not settings.ALWAYS_REDIRECT_DOWNLOADS:

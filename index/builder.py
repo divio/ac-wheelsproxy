@@ -1,4 +1,6 @@
 import os
+import json
+import zipfile
 import contextlib
 from tempfile import mkdtemp
 import shutil
@@ -62,6 +64,19 @@ def split_image_name(name):
     return image, tag
 
 
+def extract_wheel_meta(fh):
+    with zipfile.ZipFile(fh) as z:
+        for member in z.infolist():
+            try:
+                dirname, basename = member.filename.split('/')
+            except ValueError:
+                continue
+            if dirname.endswith('.dist-info') and basename == 'metadata.json':
+                return json.loads(z.read(member.filename))
+        else:
+            return None
+
+
 class DockerBuilder(object):
     def __init__(self, platform_spec):
         self.image = platform_spec['image']
@@ -122,7 +137,9 @@ class DockerBuilder(object):
             if filenames:
                 assert len(filenames) == 1
                 filename = filenames[0]
+
                 with open(os.path.join(wheelhouse, filename), 'rb') as fh:
+                    build.metadata = extract_wheel_meta(fh)
                     build.md5_digest = file_digest(hashlib.md5, fh)
                     build.build.save(filename, File(fh))
                     build.filesize = build.build.size

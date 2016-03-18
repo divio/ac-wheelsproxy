@@ -99,7 +99,7 @@ class BackingIndex(models.Model):
     def _unsynced_events(self):
         return self.client.changelog_since_serial(self.last_update_serial)
 
-    def sync(self):
+    def itersync(self):
         session = requests.Session()
         events = self._unsynced_events()
         while events:
@@ -111,8 +111,13 @@ class BackingIndex(models.Model):
                          index=self,
                          slug=normalize_package_name(package_name),
                     ).delete()
+                yield self.last_update_serial
             events = self._unsynced_events()
         self.save(update_fields=['last_update_serial'])
+
+    def sync(self):
+        for i in self.itersync():
+            pass
 
     def import_package(self, package_name, session=None):
         # log.info('importing {} from {}'.format(package_name, self.url))

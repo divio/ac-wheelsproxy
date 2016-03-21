@@ -37,7 +37,7 @@ class Platform(models.Model):
 
     slug = models.SlugField(unique=True)
     type = models.CharField(max_length=16, choices=PLATFORM_CHOICES)
-    spec = JSONField()
+    spec = JSONField(default={})
 
     def __str__(self):
         return self.slug
@@ -243,7 +243,7 @@ class Package(models.Model):
 class Release(models.Model):
     package = models.ForeignKey(Package)
     version = models.CharField(max_length=200)
-    original_details = JSONField()
+    original_details = JSONField(null=True, blank=True)
     last_update = models.DateTimeField(auto_now=True)
 
     class Meta:

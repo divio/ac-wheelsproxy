@@ -64,5 +64,10 @@ def command(initial, index):
 
     # Sync everything since the last serial, also when initial == True, as
     # something might have changed in the meantime...
-    click.secho('Syncing remaining updates...', fg='yellow')
-    index.sync()
+    events = index.last_upstream_serial() - index.last_update_serial
+    if events:
+        click.secho('Syncing remaining updates...', fg='yellow')
+        sync_iter = index.itersync()
+        with click.progressbar(sync_iter, length=events, show_pos=True) as bar:
+            for event in bar:
+                pass

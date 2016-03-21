@@ -5,8 +5,8 @@ import re
 import six
 from six.moves import xmlrpc_client
 import requests
-import jsonfield
 from yurl import URL
+from pkg_resources import parse_version
 
 from django.db import models
 from django.core.cache import cache
@@ -16,7 +16,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils.functional import cached_property
 from django.contrib.postgres.fields import JSONField
 
-from . import storage, tasks, builder
+from . import storage, tasks, builder, utils
 
 
 log = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ class Platform(models.Model):
 
     slug = models.SlugField(unique=True)
     type = models.CharField(max_length=16, choices=PLATFORM_CHOICES)
-    spec = jsonfield.JSONField()
+    spec = JSONField(default={})
 
     def __str__(self):
         return self.slug
@@ -94,10 +94,13 @@ class BackingIndex(models.Model):
             defaults={'name': package_name})
         return package
 
+    def last_upstream_serial(self):
+        return self.client.changelog_last_serial()
+
     def _unsynced_events(self):
         return self.client.changelog_since_serial(self.last_update_serial)
 
-    def sync(self):
+    def itersync(self):
         session = requests.Session()
         events = self._unsynced_events()
         while events:
@@ -109,8 +112,13 @@ class BackingIndex(models.Model):
                          index=self,
                          slug=normalize_package_name(package_name),
                     ).delete()
+                yield self.last_update_serial
             events = self._unsynced_events()
         self.save(update_fields=['last_update_serial'])
+
+    def sync(self):
+        for i in self.itersync():
+            pass
 
     def import_package(self, package_name, session=None):
         # log.info('importing {} from {}'.format(package_name, self.url))
@@ -232,11 +240,17 @@ class Package(models.Model):
 
         return builds_qs
 
+    def get_versions(self):
+        return sorted([
+            (rel.parsed_version, rel)
+            for rel in self.release_set.all()
+        ], reverse=True)
+
 
 class Release(models.Model):
     package = models.ForeignKey(Package)
     version = models.CharField(max_length=200)
-    original_details = jsonfield.JSONField()
+    original_details = JSONField(null=True, blank=True)
     last_update = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -250,6 +264,10 @@ class Release(models.Model):
         build, created = Build.objects.get_or_create(
             release=self, platform=platform)
         return build
+
+    @cached_property
+    def parsed_version(self):
+        return parse_version(self.version)
 
 
 def upload_build_to(self, filename):
@@ -330,7 +348,14 @@ class Build(models.Model):
     @property
     def requirements(self):
         if self.metadata:
-            return self.metadata.get('run_requires')[0]['requires']
+            for requirements in self.metadata.get('run_requires', []):
+                if 'extra' not in requirements:
+                    return {
+                        utils.parse_requirement(r)
+                        for r in requirements['requires']
+                    }
+            else:
+                return []
         else:
             return None
 

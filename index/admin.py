@@ -28,6 +28,18 @@ admin.site.register(models.Platform, PlatformAdmin)
 class BackingIndexAdmin(admin.ModelAdmin):
     list_display = ('slug', 'url')
 
+    readonly_fields = (
+        'formatted_last_upstream_serial',
+    )
+
+    def formatted_last_upstream_serial(self, instance):
+        upstream_serial = instance.last_upstream_serial()
+        return '{} ({} events to sync)'.format(
+            upstream_serial,
+            upstream_serial - instance.last_update_serial,
+        )
+    formatted_last_upstream_serial.short_description = 'last upstream serial'
+
 admin.site.register(models.BackingIndex, BackingIndexAdmin)
 
 
@@ -96,6 +108,23 @@ class ReleaseAdmin(admin.ModelAdmin):
 admin.site.register(models.Release, ReleaseAdmin)
 
 
+class BuildStatusListFilter(admin.SimpleListFilter):
+    title = 'build status'
+    parameter_name = 'is_built'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('no', 'Not yet built'),
+            ('yes', 'Already built'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'no':
+            return queryset.filter(build='')
+        if self.value() == 'yes':
+            return queryset.exclude(build='')
+
+
 class BuildAdmin(admin.ModelAdmin):
     list_display = (
         'package_name',
@@ -107,6 +136,7 @@ class BuildAdmin(admin.ModelAdmin):
     list_filter = (
         'platform',
         'release__package__index',
+        BuildStatusListFilter,
     )
 
     readonly_fields = (
@@ -135,7 +165,7 @@ class BuildAdmin(admin.ModelAdmin):
     def formatted_requirements(self, instance):
         reqs = instance.requirements
         if reqs is not None:
-            return '\n'.join(reqs)
+            return '\n'.join(str(r) for r in reqs) if reqs else 'No dependencies'
         else:
             return 'n/d'
     formatted_requirements.short_description = 'requirements'

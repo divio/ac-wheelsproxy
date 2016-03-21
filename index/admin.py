@@ -108,6 +108,23 @@ class ReleaseAdmin(admin.ModelAdmin):
 admin.site.register(models.Release, ReleaseAdmin)
 
 
+class BuildStatusListFilter(admin.SimpleListFilter):
+    title = 'build status'
+    parameter_name = 'is_built'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('no', 'Not yet built'),
+            ('yes', 'Already built'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'no':
+            return queryset.filter(build='')
+        if self.value() == 'yes':
+            return queryset.exclude(build='')
+
+
 class BuildAdmin(admin.ModelAdmin):
     list_display = (
         'package_name',
@@ -119,6 +136,7 @@ class BuildAdmin(admin.ModelAdmin):
     list_filter = (
         'platform',
         'release__package__index',
+        BuildStatusListFilter,
     )
 
     readonly_fields = (

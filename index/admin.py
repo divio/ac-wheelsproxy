@@ -165,7 +165,7 @@ class BuildAdmin(admin.ModelAdmin):
     def formatted_requirements(self, instance):
         reqs = instance.requirements
         if reqs is not None:
-            return '\n'.join(reqs)
+            return '\n'.join(str(r) for r in reqs) if reqs else 'No dependencies'
         else:
             return 'n/d'
     formatted_requirements.short_description = 'requirements'

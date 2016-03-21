@@ -337,7 +337,14 @@ class Build(models.Model):
     @property
     def requirements(self):
         if self.metadata:
-            return self.metadata.get('run_requires')[0]['requires']
+            for requirements in self.metadata.get('run_requires', []):
+                if 'extra' not in requirements:
+                    return {
+                        utils.parse_requirement(r)
+                        for r in requirements['requires']
+                    }
+            else:
+                return []
         else:
             return None
 

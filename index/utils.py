@@ -1,4 +1,10 @@
+import re
 import collections
+
+from pkg_resources import Requirement
+
+
+REQ_REGEX = re.compile(r'^(?P<name>[\S]+)(?: \((?P<version>[^\)]+)\))?$')
 
 
 def bounded_submitter(task, size, args_iter):
@@ -40,3 +46,9 @@ def iter_chunks(iterable, size):
         if not res:
             break
         yield res
+
+
+def parse_requirement(s):
+    match = REQ_REGEX.match(s)
+    assert match
+    return Requirement.parse(''.join(match.groups(default='')))

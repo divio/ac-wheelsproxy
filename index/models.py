@@ -6,6 +6,7 @@ import six
 from six.moves import xmlrpc_client
 import requests
 from yurl import URL
+from pkg_resources import parse_version
 
 from django.db import models
 from django.core.cache import cache
@@ -15,7 +16,7 @@ from django.utils.translation import ugettext_lazy as _
 from django.utils.functional import cached_property
 from django.contrib.postgres.fields import JSONField
 
-from . import storage, tasks, builder
+from . import storage, tasks, builder, utils
 
 
 log = logging.getLogger(__name__)
@@ -239,6 +240,12 @@ class Package(models.Model):
 
         return builds_qs
 
+    def get_versions(self):
+        return sorted([
+            (rel.parsed_version, rel)
+            for rel in self.release_set.all()
+        ], reverse=True)
+
 
 class Release(models.Model):
     package = models.ForeignKey(Package)
@@ -257,6 +264,10 @@ class Release(models.Model):
         build, created = Build.objects.get_or_create(
             release=self, platform=platform)
         return build
+
+    @cached_property
+    def parsed_version(self):
+        return parse_version(self.version)
 
 
 def upload_build_to(self, filename):

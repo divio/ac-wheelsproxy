@@ -20,6 +20,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
 
     'raven.contrib.django.raven_compat',
+    'django_object_actions',
 
     'celery_app',
     'index',
@@ -42,7 +43,9 @@ ROOT_URLCONF = 'urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -62,6 +65,10 @@ MEDIA_URL = '/media/'
 
 STATIC_ROOT = '/static'
 STATIC_URL = '/static/'
+
+STATICFILES_DIRS = [
+    'static',
+]
 
 STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.FileSystemFinder',

@@ -1,0 +1,54 @@
+version: "2"
+
+services:
+  base:
+    image: "divio/ac-wheelsproxy:latest"
+    build:
+      context: "."
+      dockerfile: "Dockerfile"
+    command: /bin/true
+    volumes:
+      - ".:/app"
+      - "${PWD}/.data/tmp:${PWD}/.data/tmp"
+      - "${DOCKER_CERT_PATH}:/certs"
+    env_file:
+      - ".env.localdev"
+    environment:
+      TEMP_BUILD_ROOT: "${PWD}/.data/tmp"
+
+  web:
+    extends: base
+    build: ""
+    command: ./manage.py runserver 0.0.0.0:80
+    links:
+      - db:postgres
+      - redis:redis
+    environment:
+      VIRTUAL_HOST: "wheels.local.aldryn.net"
+
+  worker:
+    extends: base
+    build: ""
+    command: celery -A celery_app.app worker -B -l info --concurrency=4 -Ofair
+    links:
+      - db:postgres
+      - redis:redis
+
+  db:
+    image: postgres:9.4
+    volumes:
+      - "postgres:/var/lib/postgresql/data"
+    environment:
+      POSTGRES_PASSWORD: "NsIss7yto5KnkUrrz8uvmlsvhtcIhlNdJ85tXTwib9hJY2mRiz2ZoBlJIrazzbt7GghhTitsTIsIk6Ro"
+      POSTGRES_USER: "wheelsproxy"
+      POSTGRES_DB: "wheelsproxy"
+
+  redis:
+    image: aldryn/redis:latest
+    environment:
+      PASSWORD: "iflxy6RtsoSTpFVwE9UMxpYmUiSTzr9ObXxgjracJJ6Rxr5oMw2h2cUGKFU3hCNyChOYWMMBsvH3OHkE"
+
+
+volumes:
+  postgres:
+    driver: local

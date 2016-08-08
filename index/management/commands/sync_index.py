@@ -4,17 +4,19 @@ import six
 from six.moves import zip as iterzip
 
 import djclick as click
+from djclick.params import ModelInstance
 
-from ... import models, tasks, utils
+from celery_app import utils
+
+from ...models import BackingIndex
+from ...tasks import import_packages
 
 
 @click.command()
 @click.option('--initial/--no-initial',
               help='Perform the initial sync (not using diffs).')
-@click.argument('index')
+@click.argument('index', type=ModelInstance(BackingIndex, lookup='slug'))
 def command(initial, index):
-    index = models.BackingIndex.objects.get(slug=index)
-
     if not index.last_update_serial or initial:
         chunk_size = 150  # Number of packages to update per task
         concurrency = 30  # Number of concurrent tasks
@@ -42,7 +44,7 @@ def command(initial, index):
         # Submit each tuple in args to the workers, but limit it to at most
         # `concurrency` running tasks
         results_iterator = utils.bounded_submitter(
-            tasks.import_packages,
+            import_packages,
             concurrency,
             args,
         )
@@ -64,7 +66,7 @@ def command(initial, index):
 
     # Sync everything since the last serial, also when initial == True, as
     # something might have changed in the meantime...
-    events = index.last_upstream_serial() - index.last_update_serial
+    events = index.client.changelog_last_serial() - index.last_update_serial
     if events:
         click.secho('Syncing remaining updates...', fg='yellow')
         sync_iter = index.itersync()

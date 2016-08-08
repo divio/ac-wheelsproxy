@@ -7,7 +7,9 @@ import shutil
 import hashlib
 import io
 
-from six.moves import urllib, shlex_quote
+from six.moves import shlex_quote
+
+import furl
 
 from docker import Client, tls
 
@@ -26,9 +28,10 @@ def tempdir(*args, **kwargs):
     shutil.rmtree(tmp_path)
 
 
-def get_docker_client(host, cert_path):
+def get_docker_client(dsn):
     tls_config = None
-    url = urllib.parse.urlparse(host)
+    url = furl.furl(dsn)
+    cert_path = url.args.get('cert_path')
     if url.scheme in ['tcp', 'https']:
         host = 'https://{}'.format(url.netloc)
         if cert_path:
@@ -40,6 +43,8 @@ def get_docker_client(host, cert_path):
                 verify=ca,
                 assert_hostname=False,
             )
+    else:
+        host = dsn
     return Client(host, tls=tls_config, version='auto')
 
 
@@ -80,10 +85,7 @@ def extract_wheel_meta(fh):
 class DockerBuilder(object):
     def __init__(self, platform_spec):
         self.image = platform_spec['image']
-        self.client = get_docker_client(
-            settings.DOCKER_BUILDER_ENDPOINT,
-            settings.DOCKER_BUILDER_CERTS,
-        )
+        self.client = get_docker_client(settings.BUILDS_DOCKER_DSN)
 
     def __call__(self, build):
         cmd = ' '.join([

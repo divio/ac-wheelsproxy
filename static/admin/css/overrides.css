@@ -1,0 +1,18 @@
+td.original p {
+  visibility: hidden
+}
+
+.inline-group .tabular tr.has_original td {
+    padding-top: 5px;
+}
+
+.change-form .form-row .simple-code-block {
+    margin: -10px 0 3px 0;
+    background: #fcfcfc;
+    border: 1px solid #eee;
+    padding: 10px 8px;
+    display: inline-block;
+    max-height: 500px;
+    width: 900px;
+    overflow: scroll;
+}

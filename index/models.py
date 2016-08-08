@@ -293,15 +293,32 @@ class BuildsManager(models.Manager):
 class Build(models.Model):
     release = models.ForeignKey(Release)
     platform = models.ForeignKey(Platform)
-    md5_digest = models.CharField(max_length=32, default='', blank=True)
-    build = models.FileField(storage=storage.builds_storage,
-                             upload_to=upload_build_to,
-                             max_length=255, blank=True, null=True)
-    metadata = JSONField(null=True, blank=True)
-    filesize = models.PositiveIntegerField(blank=True, null=True)
-    build_timestamp = models.DateTimeField(blank=True, null=True)
-    build_duration = models.PositiveIntegerField(blank=True, null=True)
-    build_log = models.TextField(blank=True)
+    md5_digest = models.CharField(
+        verbose_name=_('MD5 digest'),
+        max_length=32,
+        default='',
+        blank=True,
+        editable=False,
+    )
+    build = models.FileField(
+        storage=storage.dsn_configured_storage('BUILDS_STORAGE_DSN'),
+        upload_to=upload_build_to,
+        max_length=255, blank=True, null=True,
+    )
+    metadata = JSONField(null=True, blank=True, editable=False)
+    filesize = models.PositiveIntegerField(
+        blank=True, null=True,
+        editable=False,
+    )
+    build_timestamp = models.DateTimeField(
+        blank=True, null=True,
+        editable=False,
+    )
+    build_duration = models.PositiveIntegerField(
+        blank=True, null=True,
+        editable=False,
+    )
+    build_log = models.TextField(blank=True, editable=False)
 
     objects = BuildsManager()
 
@@ -321,10 +338,7 @@ class Build(models.Model):
 
     def get_build_url(self, build_if_needed=False):
         if self.is_built():
-            url = self.build.url
-            # Workaround until https://github.com/boto/boto/pull/3470 is fixed
-            url = str(URL(url).replace(query=''))
-            return url
+            return self.build.url
         else:
             if build_if_needed:
                 self.schedule_build()
@@ -387,16 +401,3 @@ class Build(models.Model):
             return self.md5_digest
         else:
             return self.release.original_details['md5_digest']
-
-    def to_pypi_dict(self):
-        details = self.release.original_details
-        if self.is_built():
-            # TODO: Provide these values
-            # details['python_version']
-            details['upload_time'] = self.build_timestamp
-            details['size'] = self.filesize
-            details['filename'] = self.filename
-            details['packagetype'] = 'bdist_wheel'
-            details['md5_digest'] = self.md5_digest
-        details['url'] = self.get_absolute_url()
-        return details

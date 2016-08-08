@@ -27,12 +27,11 @@ def build(build_id, force=False):
 @shared_task
 def import_packages(index_id, package_names):
     from . import models
-    session = requests.Session()
     index = models.BackingIndex.objects.get(pk=index_id)
     succeded, failed, ignored = {}, {}, []
     for package_name in package_names:
         try:
-            id = index.import_package(package_name, session)
+            id = index.import_package(package_name)
         except Exception as e:
             log.exception('Failed to import {} from {}'.format(
                 package_name, index.url))
@@ -47,12 +46,19 @@ def import_packages(index_id, package_names):
 
 
 @shared_task(ignore_result=True)
+def sync_index(index_id):
+    from . import models
+    index = models.BackingIndex.objects.get(pk=index_id)
+    if not index.last_update_serial:
+        log.warning('Skipping index without intial sync "{}"'
+                    .format(index.slug))
+        return
+    log.info('Syncing index "{}"'.format(index.slug))
+    index.sync()
+
+
+@shared_task(ignore_result=True)
 def sync_indexes():
     from . import models
-    for index in models.BackingIndex.objects.all():
-        if not index.last_update_serial:
-            log.warning('Skipping index without intial sync "{}"'
-                        .format(index.slug))
-            continue
-        log.info('Syncing index "{}"'.format(index.slug))
-        index.sync()
+    for index_pk in models.BackingIndex.objects.values_list('pk', flat=True):
+        sync_index(index_pk)

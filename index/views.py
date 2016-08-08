@@ -1,9 +1,8 @@
 import json
 
-import six
-
 from django.http import HttpResponse
-from django.core.cache import cache
+from django.core.cache import cache as cache_backend
+from django.core.cache.backends import dummy
 from django.utils.text import slugify
 from django.views.generic import RedirectView, View, TemplateView
 from django.utils.functional import cached_property
@@ -77,35 +76,26 @@ class DirectBuildGetterMixin(object):
             return super(DirectBuildGetterMixin, self).build
 
 
-class PackageInfo(DevelopmentIndexMixin, JSONView):
-    def process_package_info(self, payload):
-        for version, releases in six.iteritems(payload['releases']):
-            if releases:
-                release = self.package.get_release(
-                    version, self.package.get_best_release(releases))
-                build = release.get_build(self.platform)
-                payload['releases'][version] = [build.to_pypi_dict()]
-        # Process the `urls` section later so that we already got the
-        # correct build created
-        version = payload['info']['version']
-        payload['urls'] = payload['releases'][version]
-        return payload
-
-    def get_data(self, request, *args, **kwargs):
-        return self.process_package_info(
-            self.index.get_package_details(self.package_name, self.version))
-
-
 class PackageLinks(DevelopmentIndexMixin, TemplateView):
     template_name = 'index/simple.html'
 
-    def get(self, request, *args, **kwargs):
-        cache_key = models.Package.get_cache_key(
+    def get_cache_backend(self):
+        if self.request.GET.get('cache') == 'off':
+            return dummy.DummyCache(host=None, params={})
+        else:
+            return cache_backend
+
+    def cache_key(self):
+        return models.Package.get_cache_key(
             'links',
             slugify(self.kwargs['index_slug']),
             slugify(self.kwargs['platform_slug']),
             models.normalize_package_name(self.kwargs['package_name']),
         )
+
+    def get(self, request, *args, **kwargs):
+        cache = self.get_cache_backend()
+        cache_key = self.cache_key()
         response = cache.get(cache_key)
         if not response:
             if self.package.name != self.kwargs['package_name']:

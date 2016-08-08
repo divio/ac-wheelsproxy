@@ -1,0 +1,19 @@
+.objectaction-item .btn {
+    border-radius: 15px;
+    border: 0;
+    line-height: 20px;
+    display: block;
+    float: left;
+    padding: 3px 12px;
+    background: #999;
+    font-weight: 400;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #fff;
+}
+
+.objectaction-item .btn:hover {
+    cursor: pointer;
+    background-color: #5b80b2;
+}

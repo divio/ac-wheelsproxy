@@ -1,4 +1,4 @@
-FROM aldryn/base:3.0
+FROM aldryn/base:3.15
 RUN mkdir -p /app
 WORKDIR /app
 ADD requirements.txt /app/

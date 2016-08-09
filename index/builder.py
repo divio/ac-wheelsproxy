@@ -142,8 +142,11 @@ class DockerBuilder(object):
 
                 with open(os.path.join(wheelhouse, filename), 'rb') as fh:
                     build.metadata = extract_wheel_meta(fh)
+                    fh.seek(0)
                     build.md5_digest = file_digest(hashlib.md5, fh)
+                    fh.seek(0)
                     build.build.save(filename, File(fh))
+                    fh.seek(0)
                     build.filesize = build.build.size
                     build.save()
             else:

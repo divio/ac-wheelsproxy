@@ -1,0 +1,30 @@
+machine:
+  pre:
+    - curl -sSL https://s3.amazonaws.com/circle-downloads/install-circleci-docker.sh | bash -s -- 1.10.0
+    - mkdir -p ~/bin
+    - curl -L https://github.com/docker/compose/releases/download/1.8.0/docker-compose-`uname -s`-`uname -m` > ~/bin/docker-compose
+    - chmod +x ~/bin/docker-compose
+    - docker-compose --version
+  services:
+    - docker
+  environment:
+    IMAGE_NAME: divio/ac-wheelsproxy
+    VERSION: 2.$CIRCLE_BUILD_NUM
+
+
+dependencies:
+  override:
+    - echo $VERSION >VERSION
+    - docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+    - docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$VERSION .
+
+
+deployment:
+  production:
+    branch: master
+    commands:
+      - git config user.email "circleci@aldryn.com" && git config user.name "Circle CI Bot"
+      - git tag -m "Release version $VERSION" -m "$CIRCLE_COMPARE_URL" -m "$CIRCLE_BUILD_URL" $VERSION
+      - git push origin $VERSION
+      - docker push $IMAGE_NAME:$VERSION
+      - docker push $IMAGE_NAME:latest

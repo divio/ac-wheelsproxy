@@ -303,6 +303,8 @@ class BuildAdmin(adminutils.ModelAdmin):
     formatted_requirements.short_description = _('requirements')
 
     def formatted_metadata(self, instance):
+        if not instance.metadata:
+            return '-'
         return simple_code_block(
             json.dumps(instance.metadata, indent=4)
         )
@@ -315,12 +317,15 @@ class BuildAdmin(adminutils.ModelAdmin):
     formatted_build_log.short_description = _('build log')
 
     def formatted_build_duration(self, instance):
-        return _('{} seconds').format(instance.build_duration)
+        if instance.is_built():
+            return _('{} seconds').format(instance.build_duration)
+        else:
+            return '-'
     formatted_build_duration.short_description = _('build duration')
 
     def formatted_filesize(self, instance):
         if instance.is_built():
             return filesizeformat(instance.filesize)
         else:
-            return 'n/d'
+            return '-'
     formatted_filesize.short_description = _('wheel size')

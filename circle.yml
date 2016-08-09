@@ -8,6 +8,10 @@ machine:
   services:
     - docker
   environment:
+    GIT_EMAIL: circleci@aldryn.com
+    GIT_USERNAME: "Circle CI Bot"
+    DOCKER_EMAIL: aldryn@divio.ch
+    DOCKER_USERNAME: aldrynserver
     IMAGE_NAME: divio/ac-wheelsproxy
     VERSION: 2.$CIRCLE_BUILD_NUM
 
@@ -23,7 +27,7 @@ deployment:
   production:
     branch: master
     commands:
-      - git config user.email "circleci@aldryn.com" && git config user.name "Circle CI Bot"
+      - git config user.email "$GIT_EMAIL" && git config user.name "$GIT_USERNAME"
       - git tag -m "Release version $VERSION" -m "$CIRCLE_COMPARE_URL" -m "$CIRCLE_BUILD_URL" $VERSION
       - git push origin $VERSION
       - docker push $IMAGE_NAME:$VERSION

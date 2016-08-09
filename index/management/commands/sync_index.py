@@ -63,6 +63,7 @@ def command(initial, index):
         click.secho('Removing {} outdated packages...'
                     .format(len(all_package_ids)), fg='yellow')
         index.package_set.filter(pk__in=all_package_ids).delete()
+        index.save(update_fields=['last_update_serial'])
 
     # Sync everything since the last serial, also when initial == True, as
     # something might have changed in the meantime...

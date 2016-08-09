@@ -77,7 +77,7 @@ class BackingIndexAdmin(adminutils.ModelAdmin):
     def formatted_last_upstream_serial(self, instance):
         if not instance.last_update_serial:
             return '-'
-        upstream_serial = instance.last_upstream_serial()
+        upstream_serial = instance.client.changelog_last_serial()
         return '{} ({} events to sync)'.format(
             upstream_serial,
             upstream_serial - instance.last_update_serial,

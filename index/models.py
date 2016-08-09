@@ -133,8 +133,8 @@ class BackingIndex(models.Model):
         return package.pk if release_ids else None
 
     def expire_cache(self):
-        for slug in self.package_set.values_list('slug').all():
-            cache.incr(Package.get_cache_version_key(self.slug, slug))
+        for slug in self.package_set.values_list('slug', flat=True):
+            Package.expire_package_cache(self.slug, slug)
 
 
 class Package(models.Model):
@@ -202,21 +202,23 @@ class Package(models.Model):
 
     @staticmethod
     def get_cache_version_key(index_slug, package_name):
-        return 'serial/index:{}/package:{}'.format(
-            index_slug,
-            normalize_package_name(package_name),
-        )
+        return 'serial/index:{}/package:{}'.format(index_slug, package_name)
 
-    def expire_cache(self):
-        key = self.get_cache_version_key(self.index.slug, self.name)
+    @classmethod
+    def expire_package_cache(cls, index_slug, package_name):
+        key = cls.get_cache_version_key(index_slug, package_name)
         try:
             cache.incr(key)
         except ValueError:
             cache.set(key, 1, timeout=None)
 
+    def expire_cache(self):
+        self.expire_package_cache(self.index.slug, self.slug)
+
     def get_builds(self, platform, check=True):
         releases = (Release.objects
                     .filter(package=self)
+                    .order_by('-version')
                     .only('pk')
                     .all())
         builds_qs = (Build.objects
@@ -225,10 +227,9 @@ class Package(models.Model):
                      .all())
 
         if check and (len(builds_qs) != len(releases)):
-            for r in releases:
-                r.get_build(platform)
-
-        return builds_qs
+            return [r.get_build(platform) for r in releases]
+        else:
+            return list(builds_qs)
 
     def get_versions(self):
         return sorted([

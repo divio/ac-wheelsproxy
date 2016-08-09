@@ -1,7 +1,6 @@
 import logging
 from collections import namedtuple
 import io
-import os
 
 import six
 

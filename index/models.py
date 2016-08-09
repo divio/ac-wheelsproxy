@@ -90,10 +90,12 @@ class BackingIndex(models.Model):
             if package_name:
                 if not self.import_package(package_name):
                     # Nothing imported: remove the package
-                    Package.objects.filter(
-                        index=self,
-                        slug=normalize_package_name(package_name),
-                    ).delete()
+                    slug = normalize_package_name(package_name)
+                    Package.objects.filter(index=self, slug=slug).delete()
+                    cache.delete(
+                        Package.get_cache_version_key(self.slug, slug),
+                    )
+
             if serial > self.last_update_serial:
                 self.last_update_serial = serial
                 yield self.last_update_serial
@@ -126,25 +128,13 @@ class BackingIndex(models.Model):
         if release_ids:
             # Remove outdated releases
             package.release_set.exclude(pk__in=release_ids).delete()
-        package.expire_cache()
+            # Expire the cache
+            package.expire_cache()
         return package.pk if release_ids else None
 
-    def expire_cache(self, platform=None):
-        if platform:
-            platforms = [platform]
-        else:
-            platforms = Platform.objects.all()
+    def expire_cache(self):
         for slug in self.package_set.values_list('slug').all():
-            for platform in platforms:
-                for namespace in ('links',):
-                    key = Package.get_cache_key(
-                        namespace,
-                        self.slug,
-                        platform.slug,
-                        slug,
-                    )
-                    if cache.has_key(key):
-                        cache.delete(key)
+            cache.incr(Package.get_cache_version_key(self.slug, slug))
 
 
 class Package(models.Model):
@@ -191,25 +181,38 @@ class Package(models.Model):
         return instance
 
     @classmethod
-    def get_cache_key(cls, namespace, index_slug, platform_slug, package_name):
-        return '{}-index:{}-platform:{}-package:{}'.format(
-            namespace, index_slug, platform_slug, package_name)
+    def get_cache_key(cls, namespace, index_slugs, platform_slug, package_name):
+        version_keys = sorted([
+            cls.get_cache_version_key(index_slug, package_name)
+            for index_slug in index_slugs
+        ])
+        versions = cache.get_many(version_keys)
+        version_hash = ','.join(
+            str(versions.get(k, 0))
+            for k in version_keys
+        )
 
-    def expire_cache(self, platform=None):
-        if platform:
-            platforms = [platform]
-        else:
-            platforms = Platform.objects.all()
-        for platform in platforms:
-            for namespace in ('links',):
-                key = self.get_cache_key(
-                    namespace,
-                    self.index.slug,
-                    platform.slug,
-                    self.slug,
-                )
-                if cache.has_key(key):
-                    cache.delete(key)
+        return '{}/indexes:{}/platform:{}/package:{}/v:{}'.format(
+            namespace,
+            '+'.join(index_slugs),
+            platform_slug,
+            package_name,
+            version_hash,
+        )
+
+    @staticmethod
+    def get_cache_version_key(index_slug, package_name):
+        return 'serial/index:{}/package:{}'.format(
+            index_slug,
+            normalize_package_name(package_name),
+        )
+
+    def expire_cache(self):
+        key = self.get_cache_version_key(self.index.slug, self.name)
+        try:
+            cache.incr(key)
+        except ValueError:
+            cache.set(key, 1, timeout=None)
 
     def get_builds(self, platform, check=True):
         releases = (Release.objects
@@ -330,7 +333,7 @@ class Build(models.Model):
     def rebuild(self):
         builder = self.platform.get_builder()
         builder(self)
-        self.release.package.expire_cache(self.platform)
+        self.release.package.expire_cache()
 
     def schedule_build(self, force=False):
         return tasks.build.delay(self.pk, force=force)
@@ -384,7 +387,7 @@ class Build(models.Model):
             return self.get_build_url()
         else:
             return reverse('index:download_build', kwargs={
-                'index_slug': self.release.package.index.slug,
+                'index_slugs': self.release.package.index.slug,
                 'platform_slug': self.platform.slug,
                 'version': self.release.version,
                 'package_name': self.release.package.slug,

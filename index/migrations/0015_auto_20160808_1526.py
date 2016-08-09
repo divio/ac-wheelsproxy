@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='backingindex',
             name='backend',
-            field=models.CharField(choices=[(b'pypi', 'PyPI'), (b'devpi', 'DevPI')], default=b'pypi', max_length=255),
+            field=models.CharField(choices=[(b'index.client.PyPIClient', 'PyPI'), (b'index.client.DevPIClient', 'DevPI')], default=b'index.client.PyPIClient', max_length=255),
         ),
         migrations.AlterField(
             model_name='backingindex',

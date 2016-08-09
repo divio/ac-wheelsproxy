@@ -23,6 +23,11 @@ dependencies:
     - docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$VERSION .
 
 
+test:
+  override:
+    - echo "OK"
+
+
 deployment:
   production:
     branch: master

@@ -108,7 +108,8 @@ class PackageLinks(PackageViewMixin, TemplateView):
                 package = None
                 builds = []
             else:
-                builds = unique_builds(package.get_builds(self.platform))
+                builds = package.get_builds(self.platform, check=True)
+                builds = unique_builds(builds)
             links.append((index, package, builds))
 
         return links

@@ -237,7 +237,12 @@ class Package(models.Model):
 class Release(models.Model):
     package = models.ForeignKey(Package)
     version = models.CharField(max_length=200)
-    url = models.URLField(blank=True, max_length=255, default='')
+    url = models.URLField(
+        verbose_name=_('URL'),
+        blank=True,
+        max_length=255,
+        default='',
+    )
     md5_digest = models.CharField(
         verbose_name=_('MD5 digest'),
         max_length=32,

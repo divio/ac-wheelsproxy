@@ -44,17 +44,40 @@ def simple_code_block(code):
     return html.format_html('<pre class="simple-code-block">\n{}</pre>', code)
 
 
-def admin_detail_url(instance, text=None):
-    if instance._meta.proxy_for_model:
-        model_name = instance._meta.proxy_for_model._meta.model_name
-    else:
-        model_name = instance._meta.model_name
+def admin_detail_link(instance, text=None, bold=False):
+    if instance is None:
+        return u'n/a'
     url = reverse('admin:{app_label}_{model_name}_change'.format(
         app_label=instance._meta.app_label,
-        model_name=model_name,
-    ), args=(instance.id,))
+        model_name=instance._meta.model_name,
+    ), args=(instance.pk,))
     text = six.text_type(instance) if text is None else text
-    return html.format_html('<a href="{}">{}</a>', url, text)
+    style = 'font-weight: bold;' if bold else ''
+    return html.format_html('<a href="{}" style="{}">{}</a>', url, style, text)
+
+
+def linked_relation(attribute_name, short_description=None):
+    def getter(self, obj):
+        for attr in attribute_name.split('__'):
+            obj = getattr(obj, attr)
+        return admin_detail_link(obj)
+    if short_description is None:
+        short_description = attribute_name.replace('__', ' ').replace('_', ' ')
+    getter.short_description = short_description
+    getter.admin_order_field = attribute_name
+    getter.allow_tags = True
+    return getter
+
+
+def linked_inline(attribute_name, short_description=None):
+    def getter(self, obj):
+        return admin_detail_link(obj, getattr(obj, attribute_name), bold=True)
+    if short_description is None:
+        short_description = attribute_name.replace('_', ' ')
+    getter.short_description = short_description
+    getter.admin_order_field = attribute_name
+    getter.allow_tags = True
+    return getter
 
 
 class AdminURLFieldWidget(widgets.AdminURLFieldWidget):

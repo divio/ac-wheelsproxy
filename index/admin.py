@@ -10,8 +10,10 @@ from django.template.defaultfilters import filesizeformat
 from . import models, adminutils, tasks
 from .adminutils import (
     simple_code_block,
-    admin_detail_url,
+    admin_detail_link,
     queryset_action,
+    linked_inline,
+    linked_relation,
 )
 
 
@@ -85,22 +87,23 @@ class BackingIndexAdmin(adminutils.ModelAdmin):
 
 class ReleaseInline(admin.TabularInline):
     fields = (
-        'admin_link',
+        'formatted_version',
     )
     readonly_fields = (
-        'admin_link',
+        'formatted_version',
     )
     model = models.Release
     extra = 0
 
-    def admin_link(self, instance):
-        return admin_detail_url(instance, instance.version)
-    admin_link.short_description = _('version')
+    formatted_version = linked_inline('version')
 
 
 @admin.register(models.Package)
 class PackageAdmin(adminutils.ModelAdmin):
-    list_display = ('slug', 'index')
+    list_display = (
+        'slug',
+        'index_name',
+    )
 
     search_fields = ('name',)
 
@@ -120,6 +123,8 @@ class PackageAdmin(adminutils.ModelAdmin):
         'expire_cache_action',
     )
 
+    index_name = linked_relation('index')
+
     @queryset_action
     def expire_cache_action(self, request, queryset):
         for package in queryset.iterator():
@@ -131,21 +136,19 @@ class PackageAdmin(adminutils.ModelAdmin):
 
 class BuildInline(admin.TabularInline):
     fields = (
-        'admin_link',
+        'formatted_platform',
         'is_built',
         'formatted_filesize',
     )
     readonly_fields = (
-        'admin_link',
+        'formatted_platform',
         'is_built',
         'formatted_filesize',
     )
     model = models.Build
     extra = 0
 
-    def admin_link(self, instance):
-        return admin_detail_url(instance, instance.platform.slug)
-    admin_link.short_description = 'platform'
+    formatted_platform = linked_inline('platform')
 
     def formatted_filesize(self, instance):
         if instance.is_built():
@@ -157,6 +160,12 @@ class BuildInline(admin.TabularInline):
 
 @admin.register(models.Release)
 class ReleaseAdmin(adminutils.ModelAdmin):
+    list_display = (
+        'version',
+        'package_name',
+        'index_name',
+    )
+
     raw_id_fields = (
         'package',
     )
@@ -172,6 +181,25 @@ class ReleaseAdmin(adminutils.ModelAdmin):
     readonly_fields = (
         'md5_digest',
     )
+
+    list_filter = (
+        'package__index',
+    )
+
+    package_name = linked_relation('package')
+
+    index_name = linked_relation('package__index', _('index'))
+
+    def get_queryset(self, request):
+        return (
+            super(ReleaseAdmin, self)
+            .get_queryset(request)
+            .select_related('package__index')
+        )
+
+    def index(self, instance):
+        return instance.package.index
+    index.admin_order_field = 'package__index'
 
 
 class BuildStatusListFilter(admin.SimpleListFilter):
@@ -194,8 +222,9 @@ class BuildStatusListFilter(admin.SimpleListFilter):
 @admin.register(models.Build)
 class BuildAdmin(adminutils.ModelAdmin):
     list_display = (
-        'package_name',
         'version',
+        'package_name',
+        'index_name',
         'platform_name',
         'is_built',
     )
@@ -216,7 +245,9 @@ class BuildAdmin(adminutils.ModelAdmin):
         'formatted_build_log',
     )
 
-    search_fields = ['release__package__name']
+    search_fields = (
+        'release__package__name',
+    )
 
     raw_id_fields = (
         'release',
@@ -229,6 +260,14 @@ class BuildAdmin(adminutils.ModelAdmin):
         'rebuild_action',
     )
 
+    def get_queryset(self, request):
+        return (
+            super(BuildAdmin, self)
+            .get_queryset(request)
+            .select_related('release__package__index')
+            .select_related('platform')
+        )
+
     @queryset_action
     def rebuild_action(self, request, queryset):
         for build_pk in queryset.values_list('pk', flat=True):
@@ -237,26 +276,28 @@ class BuildAdmin(adminutils.ModelAdmin):
     rebuild_action.short_description = _(
         'Trigger a rebuild for the selected builds')
 
-    def platform_name(self, build):
-        return build.platform.slug
-
-    def package_name(self, build):
-        return build.release.package.name
-
     def version(self, build):
         return build.release.version
+
+    package_name = linked_relation('release__package', _('package'))
+
+    index_name = linked_relation('release__package__index', _('index'))
+
+    platform_name = linked_relation('platform')
 
     def is_built(self, build):
         return bool(build.build)
     is_built.boolean = True
+    is_built.admin_order_field = 'build'
 
     def formatted_requirements(self, instance):
         reqs = instance.requirements
-        if reqs is not None:
-            return (
-                '\n'.join(str(r) for r in reqs)
-                if reqs else _('No dependencies')
-            )
+        if reqs is not None and reqs:
+            reqs = (str(r) for r in reqs)
+            reqs = sorted(reqs, key=lambda k: k.lower())
+            return simple_code_block('\n'.join(reqs))
+        elif reqs is not None:
+            return _('No dependencies')
         else:
             return '-'
     formatted_requirements.short_description = _('requirements')
@@ -271,7 +312,7 @@ class BuildAdmin(adminutils.ModelAdmin):
         if not instance.build:
             return '-'
         return simple_code_block(instance.build_log)
-    formatted_metadata.short_description = _('build log')
+    formatted_build_log.short_description = _('build log')
 
     def formatted_build_duration(self, instance):
         return _('{} seconds').format(instance.build_duration)

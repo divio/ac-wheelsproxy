@@ -1,6 +1,6 @@
 import json
 
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.core.cache import cache as cache_backend
 from django.core.cache.backends import dummy
 from django.utils.text import slugify
@@ -8,7 +8,7 @@ from django.views.generic import RedirectView, View, TemplateView
 from django.utils.functional import cached_property
 from django.shortcuts import get_object_or_404, redirect
 
-from . import models
+from . import models, utils
 
 
 class JSONView(View):
@@ -20,17 +20,18 @@ class JSONView(View):
         return HttpResponse(payload, content_type='application/json')
 
 
-class IndexMixin(object):
+class SingleIndexMixin(object):
     @cached_property
     def index(self):
-        raise NotImplementedError
+        return get_object_or_404(
+            models.BackingIndex,
+            slug=self.kwargs['index_slug'],
+        )
 
     @cached_property
     def package(self):
-        # TODO: Redirect if the package.name does not match self.package_name
         return get_object_or_404(
-            models.Package,
-            index=self.index,
+            self.index.package_set,
             slug=models.normalize_package_name(self.package_name),
         )
 
@@ -48,21 +49,14 @@ class IndexMixin(object):
 
     @cached_property
     def platform(self):
-        raise NotImplementedError
+        return get_object_or_404(
+            models.Platform,
+            slug=self.kwargs['platform_slug'],
+        )
 
     @cached_property
     def build(self):
         return self.release.get_build(self.platform)
-
-
-class DevelopmentIndexMixin(IndexMixin):
-    @cached_property
-    def index(self):
-        return models.BackingIndex.objects.get(slug=self.kwargs['index_slug'])
-
-    @cached_property
-    def platform(self):
-        return models.Platform.objects.get(slug=self.kwargs['platform_slug'])
 
 
 class DirectBuildGetterMixin(object):
@@ -76,7 +70,7 @@ class DirectBuildGetterMixin(object):
             return super(DirectBuildGetterMixin, self).build
 
 
-class PackageLinks(DevelopmentIndexMixin, TemplateView):
+class SingleIndexPackageLinks(SingleIndexMixin, TemplateView):
     template_name = 'index/simple.html'
 
     def get_cache_backend(self):
@@ -105,23 +99,82 @@ class PackageLinks(DevelopmentIndexMixin, TemplateView):
                     platform_slug=self.kwargs['platform_slug'],
                     package_name=self.package.name,
                 )
-            response = super(PackageLinks, self).get(request, *args, **kwargs)
+            response = (
+                super(SingleIndexPackageLinks, self)
+                .get(request, *args, **kwargs)
+            )
             if hasattr(response, 'render') and callable(response.render):
                 response.render()
             cache.set(cache_key, response, timeout=None)
         return response
 
     def get_context_data(self, **kwargs):
-        context = super(PackageLinks, self).get_context_data(**kwargs)
-        context['package'] = self.package
-        context['index'] = self.index
+        context = (
+            super(SingleIndexPackageLinks, self).get_context_data(**kwargs)
+        )
+        context['package_name'] = self.package.name
         context['platform'] = self.platform
-        context['builds'] = self.package.get_builds(self.platform)
+        context['links'] = [
+            (self.index, self.package, self.package.get_builds(self.platform)),
+        ]
+        return context
+
+
+class MultiIndexPackageLinks(TemplateView):
+    template_name = 'index/simple.html'
+
+    @cached_property
+    def package_name(self):
+        return self.kwargs['package_name']
+
+    @cached_property
+    def platform(self):
+        return get_object_or_404(
+            models.Platform,
+            slug=self.kwargs['platform_slug'],
+        )
+
+    @cached_property
+    def indexes(self):
+        index_slugs = self.kwargs['index_slugs'].split('+')
+        if len(index_slugs) == 1:
+            return get_object_or_404(
+                models.BackingIndex,
+                slug=self.kwargs['index_slugs'],
+            )
+        else:
+            indexes = models.BackingIndex.objects.filter(slug__in=index_slugs)
+            indexes = {index.slug: index for index in indexes}
+            try:
+                return [indexes[slug] for slug in index_slugs]
+            except KeyError:
+                raise Http404('BackingIndex not found')
+
+    def get_context_data(self, **kwargs):
+        context = (
+            super(MultiIndexPackageLinks, self).get_context_data(**kwargs)
+        )
+        package_name = models.normalize_package_name(self.package_name)
+        context['package_name'] = package_name
+        context['platform'] = self.platform
+        context['links'] = []
+
+        unique_builds = utils.UniquesIterator(lambda b: b.release.version)
+
+        for index in self.indexes:
+            try:
+                package = index.package_set.get(slug=package_name)
+            except models.Package.DoesNotExist:
+                package = None
+                builds = []
+            else:
+                builds = unique_builds(package.get_builds(self.platform))
+            context['links'].append((index, package, builds))
         return context
 
 
 class BuildView(DirectBuildGetterMixin,
-                DevelopmentIndexMixin,
+                SingleIndexMixin,
                 RedirectView):
     permanent = False
 

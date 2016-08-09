@@ -1,17 +1,24 @@
 <html>
     <head>
-        <title>Links for {{ package.slug }}</title>
+        <title>Links for {{ package_name }}</title>
         <meta name="api-version" value="2" />
     </head>
     <body>
-        <h1>Links for {{ package.slug }}</h1>
-        {% for build in builds.all %}
-            <a href="{{ build.get_absolute_url }}#md5={{ build.get_digest }}" rel="internal">{{ build.filename }}</a><br />
+        <h1>Links for <strong>{{ package_name }}</strong> built on <strong>{{ platform.slug }}</strong></h1>
+        {% for index, package, builds in links %}
+            <h2>{{ index.slug }}</h2>
+
+            <!--
+                Platform: {{ platform.slug }} ({{ platform.pk }})
+                Index:    {{ index.slug }} ({{ index.url }})
+                Package:  {{ package.slug }} ({{ package.pk }})
+            -->
+
+            {% for build in builds %}
+                <a href="{{ build.get_absolute_url }}#md5={{ build.get_digest }}" rel="internal">{{ build.filename }}</a><br />
+            {% empty %}
+                <p>-</p>
+            {% endfor %}
         {% endfor %}
-        <!--
-            Platform: {{ platform.slug }} ({{ platform.pk }})
-            Index:    {{ index.slug }} ({{ index.url }})
-            Package:  {{ package.slug }} ({{ package.pk }})
-        -->
     </body>
 </html>

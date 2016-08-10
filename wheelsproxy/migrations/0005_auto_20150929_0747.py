@@ -3,14 +3,14 @@ from __future__ import unicode_literals
 
 from django.db import models, migrations
 import jsonfield.fields
-import index.storage
-import index.models
+import wheelsproxy.storage
+import wheelsproxy.models
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('index', '0004_build_md5_digest'),
+        ('wheelsproxy', '0004_build_md5_digest'),
     ]
 
     operations = [
@@ -27,7 +27,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='build',
             name='build',
-            field=models.FileField(storage=index.storage.dsn_configured_storage('BUILDS_STORAGE_DSN'), null=True, upload_to=index.models.upload_build_to, blank=True),
+            field=models.FileField(storage=wheelsproxy.storage.dsn_configured_storage('BUILDS_STORAGE_DSN'), null=True, upload_to=wheelsproxy.models.upload_build_to, blank=True),
         ),
         migrations.AlterField(
             model_name='build',

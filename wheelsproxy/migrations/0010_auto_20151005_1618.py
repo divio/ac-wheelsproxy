@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('index', '0009_auto_20151002_0655'),
+        ('wheelsproxy', '0009_auto_20151002_0655'),
     ]
 
     operations = [

@@ -6,7 +6,7 @@ from django.db import migrations
 
 
 def migrate_details(apps, schema_editor):
-    Release = apps.get_model('index', 'Release')
+    Release = apps.get_model('wheelsproxy', 'Release')
     releases = Release.objects.filter(original_details__isnull=False)
     for rel in releases.iterator():
         rel.url = rel.original_details['url']
@@ -17,7 +17,7 @@ def migrate_details(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('index', '0016_auto_20160808_2139'),
+        ('wheelsproxy', '0016_auto_20160808_2139'),
     ]
 
     operations = [

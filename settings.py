@@ -23,7 +23,7 @@ INSTALLED_APPS = (
     'django_object_actions',
 
     'celery_app',
-    'index',
+    'wheelsproxy',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -94,12 +94,16 @@ LOGGING = {
 
 CELERYBEAT_SCHEDULE = {
     'sync-all-indexes': {
-        'task': 'index.tasks.sync_indexes',
+        'task': 'wheelsproxy.tasks.sync_indexes',
         'schedule': timedelta(seconds=60),
     },
 }
 
 CELERY_TIMEZONE = 'UTC'
+
+CELERY_ACKS_LATE = True
+
+CELERYD_PREFETCH_MULTIPLIER = 1
 
 
 load_django_settings(EnvConfig(), locals())

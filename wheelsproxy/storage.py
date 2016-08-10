@@ -19,8 +19,8 @@ from storages.backends import s3boto
 
 
 SCHEMES = {
-    's3': 'index.storage.S3Storage',
-    'file': 'index.storage.FileSystemStorage',
+    's3': 'wheelsproxy.storage.S3Storage',
+    'file': 'wheelsproxy.storage.FileSystemStorage',
 }
 
 

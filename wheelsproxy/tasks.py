@@ -13,7 +13,7 @@ def build(build_id, force=False):
     try:
         build = models.Build.objects.get(pk=build_id)
     except models.Build.DoesNotExist:
-        pass
+        return
 
     if not force and build.build:
         # No need to build

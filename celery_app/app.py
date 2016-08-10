@@ -6,7 +6,7 @@ from raven import Client
 from raven.contrib.celery import register_signal, register_logger_signal
 
 
-app = Celery('index')
+app = Celery('wheelsproxy')
 app.config_from_object('django.conf:settings')
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
 

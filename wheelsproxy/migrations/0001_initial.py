@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from django.db import models, migrations
 import django.core.files.storage
-import index.models
+import wheelsproxy.models
 import jsonfield.fields
 
 
@@ -25,7 +25,7 @@ class Migration(migrations.Migration):
             name='Build',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('build', models.FileField(storage=django.core.files.storage.FileSystemStorage(), upload_to=index.models.upload_build_to)),
+                ('build', models.FileField(storage=django.core.files.storage.FileSystemStorage(), upload_to=wheelsproxy.models.upload_build_to)),
             ],
         ),
         migrations.CreateModel(
@@ -33,7 +33,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('slug', models.SlugField()),
-                ('index', models.ForeignKey(to='index.BackingIndex')),
+                ('index', models.ForeignKey(to='wheelsproxy.BackingIndex')),
             ],
         ),
         migrations.CreateModel(
@@ -50,18 +50,18 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
                 ('version', models.CharField(max_length=32)),
-                ('package', models.ForeignKey(to='index.Package')),
+                ('package', models.ForeignKey(to='wheelsproxy.Package')),
             ],
         ),
         migrations.AddField(
             model_name='build',
             name='platform',
-            field=models.ForeignKey(to='index.Platform'),
+            field=models.ForeignKey(to='wheelsproxy.Platform'),
         ),
         migrations.AddField(
             model_name='build',
             name='release',
-            field=models.ForeignKey(to='index.Release'),
+            field=models.ForeignKey(to='wheelsproxy.Release'),
         ),
         migrations.AlterUniqueTogether(
             name='release',

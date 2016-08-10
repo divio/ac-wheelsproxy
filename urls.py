@@ -9,7 +9,7 @@ from django.views import static
 
 urlpatterns = [
     url(r'^admin/', include(admin.site.urls)),
-    url(r'^', include('index.urls', namespace='index')),
+    url(r'^', include('wheelsproxy.urls', namespace='wheelsproxy')),
     url(r'^static/(?P<path>.*)$', static.serve, {
         'document_root': settings.STATIC_ROOT,
     }),

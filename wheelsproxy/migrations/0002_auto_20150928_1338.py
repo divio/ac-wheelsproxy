@@ -3,13 +3,13 @@ from __future__ import unicode_literals
 
 from django.db import models, migrations
 import django.core.files.storage
-import index.models
+import wheelsproxy.models
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('index', '0001_initial'),
+        ('wheelsproxy', '0001_initial'),
     ]
 
     operations = [
@@ -22,6 +22,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='build',
             name='build',
-            field=models.FileField(storage=django.core.files.storage.FileSystemStorage(), null=True, upload_to=index.models.upload_build_to, blank=True),
+            field=models.FileField(storage=django.core.files.storage.FileSystemStorage(), null=True, upload_to=wheelsproxy.models.upload_build_to, blank=True),
         ),
     ]

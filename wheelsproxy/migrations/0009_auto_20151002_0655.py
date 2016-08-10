@@ -9,7 +9,7 @@ from django.utils.timezone import utc
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('index', '0008_backingindex_last_update_serial'),
+        ('wheelsproxy', '0008_backingindex_last_update_serial'),
     ]
 
     operations = [

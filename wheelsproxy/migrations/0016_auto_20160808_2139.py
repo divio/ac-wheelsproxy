@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('index', '0015_auto_20160808_1526'),
+        ('wheelsproxy', '0015_auto_20160808_1526'),
     ]
 
     operations = [
@@ -25,6 +25,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='backingindex',
             name='backend',
-            field=models.CharField(choices=[(b'index.client.PyPIClient', 'PyPI'), (b'index.client.DevPIClient', 'DevPI')], default=b'index.client.PyPIClient', max_length=255),
+            field=models.CharField(choices=[(b'wheelsproxy.client.PyPIClient', 'PyPI'), (b'wheelsproxy.client.DevPIClient', 'DevPI')], default=b'wheelsproxy.client.PyPIClient', max_length=255),
         ),
     ]

@@ -23,8 +23,8 @@ log = logging.getLogger(__name__)
 
 
 INDEX_BACKENDS = Choices(
-    ('PYPI', 'index.client.PyPIClient', _('PyPI')),
-    ('DEVPI', 'index.client.DevPIClient', _('DevPI')),
+    ('PYPI', 'wheelsproxy.client.PyPIClient', _('PyPI')),
+    ('DEVPI', 'wheelsproxy.client.DevPIClient', _('DevPI')),
 )
 
 
@@ -387,7 +387,7 @@ class Build(models.Model):
             # this is an acceptable compromise.
             return self.get_build_url()
         else:
-            return reverse('index:download_build', kwargs={
+            return reverse('wheelsproxy:download_build', kwargs={
                 'index_slugs': self.release.package.index.slug,
                 'platform_slug': self.platform.slug,
                 'version': self.release.version,

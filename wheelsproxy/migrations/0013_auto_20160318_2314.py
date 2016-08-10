@@ -9,7 +9,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('index', '0012_build_metadata'),
+        ('wheelsproxy', '0012_build_metadata'),
     ]
 
     operations = [

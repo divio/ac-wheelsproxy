@@ -35,7 +35,7 @@ class PackageViewMixin(object):
 
 
 class PackageLinks(PackageViewMixin, TemplateView):
-    template_name = 'index/simple.html'
+    template_name = 'wheelsproxy/simple.html'
 
     def get_cache_backend(self):
         cache = True
@@ -76,7 +76,7 @@ class PackageLinks(PackageViewMixin, TemplateView):
             # Ensure package names are canonicalized
             if self.package_name != self.kwargs['package_name']:
                 return redirect(
-                    'index:package_links', permanent=True,
+                    'wheelsproxy:package_links', permanent=True,
                     index_slugs=self.kwargs['index_slugs'],
                     platform_slug=self.kwargs['platform_slug'],
                     package_name=self.package_name,

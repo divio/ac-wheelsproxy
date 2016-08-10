@@ -7,12 +7,13 @@ from django.db import models, migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('index', '0002_auto_20150928_1338'),
+        ('wheelsproxy', '0006_auto_20151002_0503'),
     ]
 
     operations = [
-        migrations.AlterUniqueTogether(
-            name='build',
-            unique_together=set([('release', 'platform')]),
+        migrations.AlterField(
+            model_name='release',
+            name='version',
+            field=models.CharField(max_length=200),
         ),
     ]

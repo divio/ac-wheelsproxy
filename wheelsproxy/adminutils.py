@@ -44,6 +44,19 @@ def simple_code_block(code):
     return html.format_html('<pre class="simple-code-block">\n{}</pre>', code)
 
 
+def options(desc, order=None, boolean=None, label=None):
+    def wrapper(func):
+        func.short_description = desc
+        if order is not None:
+            func.admin_order_field = order
+        if boolean is not None:
+            func.boolean = boolean
+        if label is not None:
+            func.label = label
+        return func
+    return wrapper
+
+
 def admin_detail_link(instance, text=None, bold=False):
     if instance is None:
         return u'n/a'

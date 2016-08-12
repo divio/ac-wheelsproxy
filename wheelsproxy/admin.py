@@ -10,10 +10,10 @@ from django.template.defaultfilters import filesizeformat
 from . import models, adminutils, tasks
 from .adminutils import (
     simple_code_block,
-    admin_detail_link,
     queryset_action,
     linked_inline,
     linked_relation,
+    options,
 )
 
 
@@ -329,3 +329,38 @@ class BuildAdmin(adminutils.ModelAdmin):
         else:
             return '-'
     formatted_filesize.short_description = _('wheel size')
+
+
+@admin.register(models.CompiledRequirements)
+class CompiledRequirementsAdmin(adminutils.ModelAdmin):
+    list_display = (
+        'created_at',
+        'formatted_pip_compilation_status',
+    )
+    readonly_fields = (
+        'formatted_pip_compilation_status',
+        'formatted_pip_compiled_requirements',
+        'formatted_pip_compilation_log',
+    )
+
+    @options(desc=_('Compilation log (pip)'))
+    def formatted_pip_compilation_log(self, instance):
+        if instance.is_pending():
+            return '-'
+        return simple_code_block(instance.pip_compilation_log)
+
+    @options(desc=_('Compiled requirements (pip)'))
+    def formatted_pip_compiled_requirements(self, instance):
+        if not instance.is_compiled():
+            return '-'
+        return simple_code_block(instance.pip_compiled_requirements)
+
+    @options(desc=_('Compilation status (pip)'))
+    def formatted_pip_compilation_status(self, instance):
+        duration = instance.pip_compilation_duration
+        if instance.is_failed():
+            return _('Failed in {} seconds').format(duration)
+        elif instance.is_compiled():
+            return _('Succeeded in {} seconds').format(duration)
+        else:
+            return _('Pending')

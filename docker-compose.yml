@@ -9,12 +9,15 @@ services:
     command: /bin/true
     volumes:
       - ".:/app"
+      - "./.data:/data"
       - "${PWD}/.data/tmp:${PWD}/.data/tmp"
+      - "${PWD}/.data/cache:${PWD}/.data/cache"
       - "${DOCKER_CERT_PATH}:/certs"
     env_file:
       - ".env.localdev"
     environment:
       TEMP_BUILD_ROOT: "${PWD}/.data/tmp"
+      COMPILE_CACHE_ROOT: "${PWD}/.data/cache"
 
   web:
     extends: base

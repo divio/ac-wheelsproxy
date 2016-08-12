@@ -160,6 +160,8 @@ class DockerBuilder(object):
         cmd = ' '.join([
             'pip-compile',
             '--verbose',
+            '--no-index',
+            '--index-url', requirements.index_url,
             '/workspace/requirements.in',
         ])
 

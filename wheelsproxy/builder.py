@@ -87,7 +87,7 @@ class DockerBuilder(object):
         self.image = platform_spec['image']
         self.client = get_docker_client(settings.BUILDS_DOCKER_DSN)
 
-    def __call__(self, build):
+    def build(self, build):
         cmd = ' '.join([
             'pip', 'wheel',
             '--no-deps',
@@ -116,7 +116,7 @@ class DockerBuilder(object):
                     wheelhouse: {
                         'bind': '/wheelhouse',
                         'ro': False,
-                    }
+                    },
                 }),
             )
 
@@ -151,3 +151,90 @@ class DockerBuilder(object):
                     build.save()
             else:
                 raise RuntimeError('Build failed')
+
+    def compile(self, requirements):
+        from .models import COMPILATION_STATUSES
+
+        cmd = ' '.join([
+            'pip-compile',
+            '--verbose',
+            '/workspace/requirements.in',
+        ])
+
+        compile_log = io.StringIO()
+
+        with tempdir(dir=settings.TEMP_BUILD_ROOT) as workspace:
+            with open(os.path.join(workspace, 'requirements.in'), 'wb') as fh:
+                fh.write(requirements.requirements)
+
+            image, tag = split_image_name(self.image)
+            consume_output(
+                self.client.pull(image, tag, stream=True),
+                compile_log,
+            )
+
+            cache_dir = os.path.join(
+                settings.COMPILE_CACHE_ROOT,
+                requirements.platform.slug,
+            )
+            if not os.path.exists(cache_dir):
+                os.makedirs(cache_dir)
+
+            container = self.client.create_container(
+                self.image,
+                cmd,
+                working_dir='/',
+                volumes=[
+                    '/wheelhouse',
+                    '/root/.cache',
+                ],
+                host_config=self.client.create_host_config(binds={
+                    workspace: {
+                        'bind': '/workspace',
+                        'ro': False,
+                    },
+                    cache_dir: {
+                        'bind': '/root/.cache',
+                        'ro': False,
+                    },
+                }),
+            )
+
+            compilation_start = timezone.now()
+            self.client.start(container=container['Id'])
+            consume_output(
+                self.client.attach(container=container['Id'],
+                                   stdout=True, stderr=True, stream=True),
+                compile_log,
+            )
+            compilation_end = timezone.now()
+
+            requirements.pip_compilation_log = compile_log.getvalue()
+            requirements.pip_compilation_duration = (
+                compilation_end - compilation_start
+            ).total_seconds()
+            requirements.pip_compilation_timestamp = timezone.now()
+            requirements.save(update_fields=[
+                'pip_compilation_log',
+                'pip_compilation_duration',
+                'pip_compilation_timestamp',
+            ])
+
+            compiled_requirements = os.path.join(workspace, 'requirements.txt')
+
+            if os.path.exists(compiled_requirements):
+                with open(compiled_requirements, 'rb') as fh:
+                    requirements.pip_compiled_requirements = fh.read()
+                    requirements.pip_compilation_status = COMPILATION_STATUSES.DONE
+                    requirements.save(update_fields=[
+                        'pip_compiled_requirements',
+                        'pip_compilation_status',
+                    ])
+            else:
+                requirements.pip_compiled_requirements = ''
+                requirements.pip_compilation_status = COMPILATION_STATUSES.FAILED
+                requirements.save(update_fields=[
+                    'pip_compiled_requirements',
+                    'pip_compilation_status',
+                ])
+                raise RuntimeError('Compilation failed')

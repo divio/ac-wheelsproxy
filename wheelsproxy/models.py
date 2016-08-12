@@ -340,7 +340,7 @@ class Build(models.Model):
 
     def rebuild(self):
         builder = self.platform.get_builder()
-        builder(self)
+        builder.build(self)
         self.release.package.expire_cache()
 
     def schedule_build(self, force=False):
@@ -460,3 +460,6 @@ class CompiledRequirements(models.Model):
     def is_compiled(self):
         return self.pip_compilation_status == COMPILATION_STATUSES.DONE
 
+    def recompile(self):
+        builder = self.platform.get_builder()
+        builder.compile(self)

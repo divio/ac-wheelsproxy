@@ -343,6 +343,23 @@ class CompiledRequirementsAdmin(adminutils.ModelAdmin):
         'formatted_pip_compilation_log',
     )
 
+    actions = (
+        'recompile_action',
+    )
+    change_actions = (
+        'recompile_action',
+    )
+
+    @queryset_action
+    @options(label=_('Recompile (pip)'),
+             desc=_('Trigger a recompile for the selected requirements'))
+    def recompile_action(self, request, queryset):
+        queryset.update(
+            pip_compilation_status=models.COMPILATION_STATUSES.PENDING,
+        )
+        for requirements_pk in queryset.values_list('pk', flat=True):
+            tasks.compile.delay(requirements_pk, force=True)
+
     @options(desc=_('Compilation log (pip)'))
     def formatted_pip_compilation_log(self, instance):
         if instance.is_pending():

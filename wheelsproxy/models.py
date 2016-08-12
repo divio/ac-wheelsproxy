@@ -27,6 +27,12 @@ INDEX_BACKENDS = Choices(
     ('DEVPI', 'wheelsproxy.client.DevPIClient', _('DevPI')),
 )
 
+COMPILATION_STATUSES = Choices(
+    ('PENDING', 'pending', _('Pending')),
+    ('DONE', 'done', _('Done')),
+    ('FAILED', 'failed', _('Failed')),
+)
+
 
 def normalize_package_name(package_name):
     return re.sub(r'(\.|-|_)+', '-', package_name.lower())
@@ -334,7 +340,7 @@ class Build(models.Model):
 
     def rebuild(self):
         builder = self.platform.get_builder()
-        builder(self)
+        builder.build(self)
         self.release.package.expire_cache()
 
     def schedule_build(self, force=False):
@@ -402,3 +408,58 @@ class Build(models.Model):
             return self.md5_digest
         else:
             return self.release.md5_digest
+
+
+class CompiledRequirements(models.Model):
+    platform = models.ForeignKey(Platform)
+    requirements = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    pip_compilation_status = models.CharField(
+        max_length=12,
+        editable=False,
+        choices=COMPILATION_STATUSES,
+        default=COMPILATION_STATUSES.PENDING,
+    )
+    pip_compiled_requirements = models.TextField(blank=True, editable=False)
+    pip_compilation_timestamp = models.DateTimeField(
+        blank=True, null=True,
+        editable=False,
+    )
+    pip_compilation_duration = models.PositiveIntegerField(
+        blank=True, null=True,
+        editable=False,
+    )
+    pip_compilation_log = models.TextField(blank=True, editable=False)
+
+    internal_compilation_status = models.CharField(
+        max_length=12,
+        choices=COMPILATION_STATUSES,
+        default=COMPILATION_STATUSES.PENDING,
+    )
+    internal_compiled_requirements = models.TextField(
+        blank=True,
+        editable=False,
+    )
+    internal_compilation_timestamp = models.DateTimeField(
+        blank=True, null=True,
+        editable=False,
+    )
+    internal_compilation_duration = models.PositiveIntegerField(
+        blank=True, null=True,
+        editable=False,
+    )
+    internal_compilation_log = models.TextField(blank=True, editable=False)
+
+    def is_pending(self):
+        return self.pip_compilation_status == COMPILATION_STATUSES.PENDING
+
+    def is_failed(self):
+        return self.pip_compilation_status == COMPILATION_STATUSES.FAILED
+
+    def is_compiled(self):
+        return self.pip_compilation_status == COMPILATION_STATUSES.DONE
+
+    def recompile(self):
+        builder = self.platform.get_builder()
+        builder.compile(self)

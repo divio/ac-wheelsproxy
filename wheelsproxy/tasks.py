@@ -60,3 +60,22 @@ def sync_indexes():
     from . import models
     for index_pk in models.BackingIndex.objects.values_list('pk', flat=True):
         sync_index(index_pk)
+
+
+@shared_task
+def compile(requirements_id, force=False):
+    from . import models
+
+    requirements_qs = models.CompiledRequirements.objects.all()
+
+    if not force:
+        requirements_qs = requirements_qs.filter(
+            pip_compilation_status=models.COMPILATION_STATUSES.PENDING,
+        )
+
+    try:
+        requirements = requirements_qs.get(pk=requirements_id)
+    except models.CompiledRequirements.DoesNotExist:
+        return
+
+    requirements.recompile()

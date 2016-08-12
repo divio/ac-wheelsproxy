@@ -21,6 +21,13 @@ urlpatterns = [
             name='download_build',
         ),
     ])),
+
+    # Dependencies compilation
+    url(
+        '^c/(?P<index_slugs>[a-z0-9\+-]+)/(?P<platform_slug>[a-z0-9-]+)/$',
+        views.RequirementsCompilationRequestView.as_view(),
+        name='compile_requirements',
+    ),
 ]
 
 if settings.SERVE_BUILDS:

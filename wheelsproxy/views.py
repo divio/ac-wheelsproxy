@@ -115,7 +115,7 @@ class PackageLinks(PackageViewMixin, TemplateView):
         return links
 
 
-class BuildView(PackageViewMixin, RedirectView):
+class BuildTrigger(PackageViewMixin, RedirectView):
     permanent = False
 
     @cached_property

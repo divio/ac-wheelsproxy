@@ -181,7 +181,8 @@ class Package(models.Model):
         return instance
 
     @classmethod
-    def get_cache_key(cls, namespace, index_slugs, platform_slug, package_name):
+    def get_cache_key(cls, namespace, index_slugs, platform_slug,
+                      package_name):
         version_keys = sorted([
             cls.get_cache_version_key(index_slug, package_name)
             for index_slug in index_slugs

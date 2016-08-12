@@ -19,8 +19,8 @@ from storages.backends import s3boto
 
 
 SCHEMES = {
-    's3': 'wheelsproxy.storage.S3Storage',
-    'file': 'wheelsproxy.storage.FileSystemStorage',
+    's3': 'wheelsproxy.storage.OverwritingS3Storage',
+    'file': 'wheelsproxy.storage.OverwritingFileSystemStorage',
 }
 
 
@@ -61,10 +61,18 @@ class S3Storage(s3boto.S3BotoStorage):
         )
 
 
-class OverwritingS3Storage(S3Storage):
+class OverwritingStorageMixin(object):
     def get_available_name(self, name, max_length=None):
         self.delete(name)
         return name
+
+
+class OverwritingS3Storage(OverwritingStorageMixin, S3Storage):
+    pass
+
+
+class OverwritingFileSystemStorage(OverwritingStorageMixin, FileSystemStorage):
+    pass
 
 
 class NotImplementedStorage(Storage):

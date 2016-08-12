@@ -17,3 +17,5 @@ class AppSettings(Settings):
 
     BUILDS_STORAGE_DSN = Value(str)
     BUILDS_DOCKER_DSN = Value(str)
+
+    SERVE_BUILDS = Value(boolean, default=False)

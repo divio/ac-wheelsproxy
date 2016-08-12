@@ -6,28 +6,40 @@ from . import views, storage
 
 
 urlpatterns = [
-    url(r'^d/(?P<index_slugs>[a-z0-9\+-]+)/(?P<platform_slug>[a-z0-9-]+)/', include([  # NOQA
+    # Simple index view (per-package only), for backwards compatibility
+    url(
+        r'^d/(?P<index_slugs>[a-z0-9\+-]+)/(?P<platform_slug>[a-z0-9-]+)/(?P<package_name>[a-zA-Z0-9_\.-]+)/$',  # NOQA
+        views.PackageLinks.as_view(),
+    ),
+    url(r'^v1/(?P<index_slugs>[a-z0-9\+-]+)/(?P<platform_slug>[a-z0-9-]+)/', include([  # NOQA
         # Simple index view (per-package only)
         url(
-            r'^(?P<package_name>[a-zA-Z0-9_\.-]+)/$',
+            r'^\+simple/(?P<package_name>[a-zA-Z0-9_\.-]+)/$',
             views.PackageLinks.as_view(),
             name='package_links',
         ),
 
         # Download redirects
         url(
-            r'^(?P<package_name>[^/]+)/(?P<version>[^/]+)/download/(?P<build_id>\d+)/(?P<filename>[^/]+)$',  # NOQA
+            r'^\+simple/(?P<package_name>[^/]+)/(?P<version>[^/]+)/download/(?P<build_id>\d+)/(?P<filename>[^/]+)$',  # NOQA
             views.BuildTrigger.as_view(),
             name='download_build',
         ),
-    ])),
 
-    # Dependencies compilation
-    url(
-        '^c/(?P<index_slugs>[a-z0-9\+-]+)/(?P<platform_slug>[a-z0-9-]+)/$',
-        views.RequirementsCompilationRequestView.as_view(),
-        name='compile_requirements',
-    ),
+        # Dependencies compilation
+        url(
+            r'^\+compile/$',
+            views.RequirementsCompilationView.as_view(),
+            name='compile_requirements',
+        ),
+
+        # URLs resolution
+        url(
+            r'^\+resolve/$',
+            views.RequirementsResolution.as_view(),
+            name='resolve_requirements',
+        ),
+    ])),
 ]
 
 if settings.SERVE_BUILDS:

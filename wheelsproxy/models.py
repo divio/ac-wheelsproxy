@@ -3,7 +3,7 @@ import logging
 import re
 
 import six
-from pkg_resources import parse_version
+from pkg_resources import parse_version, safe_version
 
 from django.db import models
 from django.core.cache import cache
@@ -36,6 +36,26 @@ COMPILATION_STATUSES = Choices(
 
 def normalize_package_name(package_name):
     return re.sub(r'(\.|-|_)+', '-', package_name.lower())
+
+
+def normalize_version(version):
+    return safe_version(version)
+
+
+def get_release(indexes, package_slug, version):
+    candidates = list(Release.objects.filter(
+        version=version,
+        package__slug=package_slug,
+        package__index__in=indexes,
+    ).select_related('package'))
+    candidates = {c.package.index_id: c for c in candidates}
+    for index in indexes:
+        try:
+            return candidates[index.pk]
+        except KeyError:
+            pass
+    else:
+        raise Release.DoesNotExist('Release matching query could not be found')
 
 
 class Platform(models.Model):
@@ -165,6 +185,7 @@ class Package(models.Model):
                     return release
 
     def get_release(self, version, release=None):
+        version = normalize_version(version)
         instance, created = Release.objects.get_or_create(
             package=self, version=version)
         if created:

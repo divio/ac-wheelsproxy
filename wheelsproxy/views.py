@@ -1,14 +1,15 @@
-from django.http import Http404
+from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.core.cache import cache as cache_backend
 from django.core.cache.backends import dummy
 from django.utils.text import slugify
-from django.views.generic import RedirectView, TemplateView
+from django.views.generic import RedirectView, TemplateView, View
 from django.views.decorators import gzip
+from django.views.decorators.csrf import csrf_exempt
 from django.utils.functional import cached_property
 from django.utils.decorators import method_decorator
 from django.shortcuts import get_object_or_404, redirect
 
-from . import models, utils
+from . import models, utils, tasks
 
 
 class PackageViewMixin(object):
@@ -139,3 +140,24 @@ class BuildTrigger(PackageViewMixin, RedirectView):
 
     def get_redirect_url(self, *args, **kwargs):
         return self.build.get_build_url(build_if_needed=True)
+
+
+class RequirementsCompilationRequestView(PackageViewMixin, View):
+    @method_decorator(csrf_exempt)
+    def dispatch(self, request, *args, **kwargs):
+        return (super(RequirementsCompilationRequestView, self)
+                .dispatch(request, *args, **kwargs))
+
+    def post(self, request, *args, **kwargs):
+        reqs = models.CompiledRequirements.objects.create(
+            platform=self.platform,
+            requirements=request.body,
+        )
+        tasks.compile.delay(reqs.pk).get()
+        reqs = models.CompiledRequirements.objects.get(pk=reqs.pk)
+        if reqs.is_compiled():
+            return HttpResponse(reqs.pip_compiled_requirements)
+        else:
+            return HttpResponseBadRequest(
+                'Requirements could not be compiled (#{})'.format(reqs.pk)
+            )

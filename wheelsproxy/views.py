@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.core.cache import cache as cache_backend
 from django.core.cache.backends import dummy
@@ -144,6 +145,7 @@ class BuildTrigger(PackageViewMixin, RedirectView):
 
 class RequirementsCompilationRequestView(PackageViewMixin, View):
     @method_decorator(csrf_exempt)
+    @method_decorator(transaction.non_atomic_requests)
     def dispatch(self, request, *args, **kwargs):
         return (super(RequirementsCompilationRequestView, self)
                 .dispatch(request, *args, **kwargs))

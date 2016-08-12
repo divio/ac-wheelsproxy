@@ -129,6 +129,8 @@ class DockerBuilder(object):
             )
             build_end = timezone.now()
 
+            self.client.remove_container(container=container['Id'], v=True)
+
             build.build_log = build_log.getvalue()
             build.build_duration = (build_end - build_start).total_seconds()
             build.build_timestamp = timezone.now()
@@ -208,6 +210,8 @@ class DockerBuilder(object):
                 compile_log,
             )
             compilation_end = timezone.now()
+
+            self.client.remove_container(container=container['Id'], v=True)
 
             requirements.pip_compilation_log = compile_log.getvalue()
             requirements.pip_compilation_duration = (

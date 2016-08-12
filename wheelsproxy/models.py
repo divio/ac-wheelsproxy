@@ -41,6 +41,23 @@ def normalize_package_name(package_name):
 def normalize_version(version):
     return safe_version(version)
 
+
+def get_release(indexes, package_slug, version):
+    candidates = list(Release.objects.filter(
+        version=version,
+        package__slug=package_slug,
+        package__index__in=indexes,
+    ).select_related('package'))
+    candidates = {c.package.index_id: c for c in candidates}
+    for index in indexes:
+        try:
+            return candidates[index.pk]
+        except KeyError:
+            pass
+    else:
+        raise Release.DoesNotExist('Release matching query could not be found')
+
+
 class Platform(models.Model):
     DOCKER = 'docker'
     PLATFORM_CHOICES = [

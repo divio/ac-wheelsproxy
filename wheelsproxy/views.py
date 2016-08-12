@@ -1,3 +1,5 @@
+import io
+
 from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.core.cache import cache as cache_backend
@@ -143,23 +145,71 @@ class BuildTrigger(PackageViewMixin, RedirectView):
         return self.build.get_build_url(build_if_needed=True)
 
 
-class RequirementsCompilationRequestView(PackageViewMixin, View):
+class RequirementsProcessingMixin(object):
     @method_decorator(csrf_exempt)
     @method_decorator(transaction.non_atomic_requests)
     def dispatch(self, request, *args, **kwargs):
-        return (super(RequirementsCompilationRequestView, self)
+        return (super(RequirementsProcessingMixin, self)
                 .dispatch(request, *args, **kwargs))
 
     def post(self, request, *args, **kwargs):
+        return self.process_body(request.body)
+
+
+class RequirementsCompilationView(RequirementsProcessingMixin,
+                                  PackageViewMixin,
+                                  View):
+    def process_body(self, body):
         reqs = models.CompiledRequirements.objects.create(
             platform=self.platform,
-            requirements=request.body,
+            requirements=body,
         )
         tasks.compile.delay(reqs.pk).get()
         reqs = models.CompiledRequirements.objects.get(pk=reqs.pk)
         if reqs.is_compiled():
-            return HttpResponse(reqs.pip_compiled_requirements)
+            return HttpResponse(
+                reqs.pip_compiled_requirements,
+                content_type='text/plain',
+            )
         else:
             return HttpResponseBadRequest(
-                'Requirements could not be compiled (#{})'.format(reqs.pk)
+                'Requirements could not be compiled (#{})'.format(reqs.pk),
+                content_type='text/plain',
             )
+
+
+class RequirementsResolution(RequirementsProcessingMixin,
+                             PackageViewMixin,
+                             View):
+    @staticmethod
+    def _filter_urls(reqs, urls):
+        for req in reqs:
+            if req.startswith('https://'):
+                urls.append(req.strip())
+                continue
+            if req.startswith('http://'):
+                urls.append(req.strip())
+                continue
+            yield req
+
+    def process_body(self, body):
+        from pkg_resources import parse_requirements
+
+        urls = []
+        reqs = body.splitlines()
+        reqs = parse_requirements(self._filter_urls(reqs, urls))
+
+        for req in reqs:
+            assert len(req.specs) == 1
+            assert req.specs[0][0] == '=='
+
+            release = models.get_release(
+                self.indexes,
+                models.normalize_package_name(req.key),
+                models.normalize_version(req.specs[0][1]),
+            )
+            build = release.get_build(self.platform)
+            url = self.request.build_absolute_uri(build.get_absolute_url())
+            urls.append(url)
+
+        return HttpResponse('\n'.join(urls), content_type='text/plain')

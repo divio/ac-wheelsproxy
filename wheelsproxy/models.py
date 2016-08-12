@@ -434,6 +434,7 @@ class Build(models.Model):
 class CompiledRequirements(models.Model):
     platform = models.ForeignKey(Platform)
     requirements = models.TextField()
+    index_url = models.URLField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     pip_compilation_status = models.CharField(

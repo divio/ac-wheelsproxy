@@ -1,9 +1,8 @@
-import io
-
 from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.core.cache import cache as cache_backend
 from django.core.cache.backends import dummy
+from django.core.urlresolvers import reverse
 from django.utils.text import slugify
 from django.views.generic import RedirectView, TemplateView, View
 from django.views.decorators import gzip
@@ -160,9 +159,16 @@ class RequirementsCompilationView(RequirementsProcessingMixin,
                                   PackageViewMixin,
                                   View):
     def process_body(self, body):
+        index_url = self.request.build_absolute_uri(
+            reverse('wheelsproxy:index_root', kwargs={
+                'index_slugs': self.kwargs['index_slugs'],
+                'platform_slug': self.kwargs['platform_slug'],
+            }),
+        )
         reqs = models.CompiledRequirements.objects.create(
             platform=self.platform,
             requirements=body,
+            index_url=index_url,
         )
         tasks.compile.delay(reqs.pk).get()
         reqs = models.CompiledRequirements.objects.get(pk=reqs.pk)

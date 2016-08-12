@@ -122,7 +122,7 @@ class BuildTrigger(PackageViewMixin, RedirectView):
 
     @cached_property
     def version(self):
-        return self.kwargs.get('version')
+        return models.normalize_version(self.kwargs.get('version'))
 
     @cached_property
     def build(self):

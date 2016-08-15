@@ -1,6 +1,7 @@
 import os
 import logging
 import re
+import hashlib
 
 import six
 from pkg_resources import parse_version, safe_version
@@ -311,6 +312,14 @@ def upload_build_to(self, filename):
     )
 
 
+def upload_external_build_to(self, filename):
+    return '__external__/{platform}/{url_hash}/{filename}'.format(
+        url_hash=hashlib.sha256(self.external_url).hexdigest(),
+        platform=self.platform.slug,
+        filename=filename,
+    )
+
+
 class BuildsManager(models.Manager):
     use_for_related_fields = True
 
@@ -321,8 +330,7 @@ class BuildsManager(models.Manager):
                 .select_related('release__package__index'))
 
 
-class Build(models.Model):
-    release = models.ForeignKey(Release)
+class BuildBase(models.Model):
     platform = models.ForeignKey(Platform)
     md5_digest = models.CharField(
         verbose_name=_('MD5 digest'),
@@ -330,11 +338,6 @@ class Build(models.Model):
         default='',
         blank=True,
         editable=False,
-    )
-    build = models.FileField(
-        storage=storage.dsn_configured_storage('BUILDS_STORAGE_DSN'),
-        upload_to=upload_build_to,
-        max_length=255, blank=True, null=True,
     )
     metadata = JSONField(null=True, blank=True, editable=False)
     filesize = models.PositiveIntegerField(
@@ -351,41 +354,11 @@ class Build(models.Model):
     )
     build_log = models.TextField(blank=True, editable=False)
 
-    objects = BuildsManager()
-
     class Meta:
-        unique_together = ('release', 'platform')
+        abstract = True
 
     def __str__(self):
         return self.filename
-
-    def rebuild(self):
-        builder = self.platform.get_builder()
-        builder.build(self)
-        self.release.package.expire_cache()
-
-    def schedule_build(self, force=False):
-        return tasks.build.delay(self.pk, force=force)
-
-    def get_build_url(self, build_if_needed=False):
-        if self.is_built():
-            return self.build.url
-        else:
-            if build_if_needed:
-                self.schedule_build()
-            return self.original_url
-
-    @property
-    def filename(self):
-        if self.is_built():
-            path = self.build.name
-        else:
-            path = self.original_url
-        return os.path.basename(path)
-
-    @property
-    def original_url(self):
-        return self.release.url
 
     @property
     def requirements(self):
@@ -404,6 +377,58 @@ class Build(models.Model):
     def is_built(self):
         return bool(self.build)
     is_built.boolean = True
+
+    def get_build_url(self, build_if_needed=False):
+        if self.is_built():
+            return self.build.url
+        else:
+            if build_if_needed:
+                self.schedule_build()
+            return self.original_url
+
+    def rebuild(self):
+        builder = self.platform.get_builder()
+        builder.build(self)
+
+    @property
+    def filename(self):
+        if self.is_built():
+            path = self.build.name
+        else:
+            path = self.original_url
+        return os.path.basename(path)
+
+    @property
+    def original_url(self):
+        raise NotImplementedError
+
+    def schedule_build(self, force=False):
+        raise NotImplementedError
+
+
+class Build(BuildBase):
+    release = models.ForeignKey(Release)
+    build = models.FileField(
+        storage=storage.dsn_configured_storage('BUILDS_STORAGE_DSN'),
+        upload_to=upload_build_to,
+        max_length=255, blank=True, null=True,
+    )
+
+    objects = BuildsManager()
+
+    class Meta:
+        unique_together = ('release', 'platform')
+
+    def schedule_build(self, force=False):
+        return tasks.build_internal.delay(self.pk, force=force)
+
+    def rebuild(self):
+        super(Build, self).rebuild()
+        self.release.package.expire_cache()
+
+    @property
+    def original_url(self):
+        return self.release.url
 
     def get_absolute_url(self):
         if self.is_built() and not settings.ALWAYS_REDIRECT_DOWNLOADS:
@@ -429,6 +454,25 @@ class Build(models.Model):
             return self.md5_digest
         else:
             return self.release.md5_digest
+
+
+class ExternalBuild(BuildBase):
+    external_url = models.URLField(max_length=255)
+    build = models.FileField(
+        storage=storage.dsn_configured_storage('BUILDS_STORAGE_DSN'),
+        upload_to=upload_external_build_to,
+        max_length=255, blank=True, null=True,
+    )
+
+    class Meta:
+        unique_together = ('external_url', 'platform')
+
+    def schedule_build(self, force=False):
+        return tasks.build_external.delay(self.pk, force=force)
+
+    @property
+    def original_url(self):
+        return self.external_url
 
 
 class CompiledRequirements(models.Model):

@@ -6,13 +6,10 @@ from celery import shared_task
 log = logging.getLogger(__name__)
 
 
-@shared_task(ignore_result=True)
-def build(build_id, force=False):
-    from . import models
-
+def _build(model, build_id, force):
     try:
-        build = models.Build.objects.get(pk=build_id)
-    except models.Build.DoesNotExist:
+        build = model.objects.get(pk=build_id)
+    except model.DoesNotExist:
         return
 
     if not force and build.build:
@@ -20,6 +17,18 @@ def build(build_id, force=False):
         return
 
     build.rebuild()
+
+
+@shared_task(ignore_result=True)
+def build_internal(build_id, force=False):
+    from . import models
+    _build(models.Build, build_id, force)
+
+
+@shared_task(ignore_result=True)
+def build_external(build_id, force=False):
+    from . import models
+    _build(models.ExternalBuild, build_id, force)
 
 
 @shared_task

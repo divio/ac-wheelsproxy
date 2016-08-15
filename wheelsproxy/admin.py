@@ -219,22 +219,7 @@ class BuildStatusListFilter(admin.SimpleListFilter):
             return queryset.exclude(build='')
 
 
-@admin.register(models.Build)
-class BuildAdmin(adminutils.ModelAdmin):
-    list_display = (
-        'version',
-        'package_name',
-        'index_name',
-        'platform_name',
-        'is_built',
-    )
-
-    list_filter = (
-        'platform',
-        'release__package__index',
-        BuildStatusListFilter,
-    )
-
+class BuildAdminBase(adminutils.ModelAdmin):
     readonly_fields = (
         'formatted_filesize',
         'md5_digest',
@@ -245,45 +230,34 @@ class BuildAdmin(adminutils.ModelAdmin):
         'formatted_build_log',
     )
 
-    search_fields = (
-        'release__package__name',
+    list_filter = (
+        'platform',
     )
 
-    raw_id_fields = (
-        'release',
-    )
+    platform_name = linked_relation('platform')
 
     actions = (
         'rebuild_action',
     )
+
     change_actions = (
         'rebuild_action',
     )
 
     def get_queryset(self, request):
         return (
-            super(BuildAdmin, self)
+            super(BuildAdminBase, self)
             .get_queryset(request)
-            .select_related('release__package__index')
             .select_related('platform')
         )
 
     @queryset_action
     def rebuild_action(self, request, queryset):
-        for build_pk in queryset.values_list('pk', flat=True):
-            tasks.build.delay(build_pk, force=True)
+        for build in queryset.iterator():
+            build.schedule_build(force=True)
     rebuild_action.label = _('Rebuild')
     rebuild_action.short_description = _(
         'Trigger a rebuild for the selected builds')
-
-    def version(self, build):
-        return build.release.version
-
-    package_name = linked_relation('release__package', _('package'))
-
-    index_name = linked_relation('release__package__index', _('index'))
-
-    platform_name = linked_relation('platform')
 
     def is_built(self, build):
         return bool(build.build)
@@ -329,6 +303,63 @@ class BuildAdmin(adminutils.ModelAdmin):
         else:
             return '-'
     formatted_filesize.short_description = _('wheel size')
+
+
+@admin.register(models.Build)
+class BuildAdmin(BuildAdminBase):
+    list_display = (
+        'version',
+        'package_name',
+        'index_name',
+        'platform_name',
+        'is_built',
+    )
+
+    list_filter = (
+        'platform',
+        'release__package__index',
+        BuildStatusListFilter,
+    )
+
+    search_fields = (
+        'release__package__name',
+    )
+
+    raw_id_fields = (
+        'release',
+    )
+
+    def get_queryset(self, request):
+        return (
+            super(BuildAdmin, self)
+            .get_queryset(request)
+            .select_related('release__package__index')
+        )
+
+    def version(self, build):
+        return build.release.version
+
+    package_name = linked_relation('release__package', _('package'))
+
+    index_name = linked_relation('release__package__index', _('index'))
+
+
+@admin.register(models.ExternalBuild)
+class ExternalBuildAdmin(BuildAdminBase):
+    list_display = (
+        'external_url',
+        'platform_name',
+        'is_built',
+    )
+
+    list_filter = (
+        'platform',
+        BuildStatusListFilter,
+    )
+
+    search_fields = (
+        'external_url',
+    )
 
 
 @admin.register(models.CompiledRequirements)

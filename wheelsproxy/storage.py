@@ -96,7 +96,14 @@ class _DSNConfiguredStorage(LazyObject):
             self._wrapped = NotImplementedStorage()
         else:
             url = furl.furl(dsn)
-            self._wrapped = get_storage_class(SCHEMES[url.scheme])(url)
+            storage_class = get_storage_class(SCHEMES[url.scheme])
+            # Django >= 1.9 now knows about LazyObject and sets them up before
+            # serializing them. To work around this behavior, the storage class
+            # itself needs to be deconstructible.
+            storage_class = type(storage_class.__name__, (storage_class,), {
+                'deconstruct': self._deconstructor,
+            })
+            self._wrapped = storage_class(url)
 
 
 def dsn_configured_storage(setting_name):
@@ -106,5 +113,5 @@ def dsn_configured_storage(setting_name):
     )
     return type('DSNConfiguredStorage', (_DSNConfiguredStorage,), {
         '_setting_name': setting_name,
-        'deconstruct': lambda self: (path, [setting_name], {}),
+        '_deconstructor': lambda self: (path, [setting_name], {}),
     })()

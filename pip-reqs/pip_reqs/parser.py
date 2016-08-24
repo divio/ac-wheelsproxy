@@ -21,10 +21,11 @@ def temporary_directory(*args, **kwargs):
 
 
 def link_req_to_str(req):
+    url = req.link.url.encode('utf8')
     if req.editable:
-        return '-e {}'.format(req.link.url)
+        return b'-e ' + url
     else:
-        return req.link.url
+        return url
 
 
 class RequirementsParser(object):
@@ -71,7 +72,7 @@ class RequirementsParser(object):
             else:
                 ext_reqs.append(link_req_to_str(req))
         else:
-            ext_reqs.append(str(req.req))
+            ext_reqs.append(str(req.req).encode('utf8'))
 
         return ext_reqs, loc_reqs
 

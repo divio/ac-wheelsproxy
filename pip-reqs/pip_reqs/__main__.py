@@ -20,15 +20,15 @@ def main(ctx, wheelsproxy):
 def compile(obj, infile, outfile):
     parser = RequirementsParser()
     ext_reqs, local_reqs = parser.parse(infile)
-    compiled_reqs = obj.compile('\n'.join(ext_reqs))
+    compiled_reqs = obj.compile(b'\n'.join(ext_reqs))
     outfile.write(compiled_reqs)
-    outfile.write('\n'.join([
-        '',
-        '# The following packages are available only locally.',
-        '# Their dependencies *have* been considered while',
-        '# resolving the full dependency tree:',
+    outfile.write(b'\n'.join([
+        b'',
+        b'# The following packages are available only locally.',
+        b'# Their dependencies *have* been considered while',
+        b'# resolving the full dependency tree:',
     ] + local_reqs))
-    outfile.write('\n')
+    outfile.write(b'\n')
 
 
 @main.command()

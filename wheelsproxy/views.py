@@ -11,6 +11,8 @@ from django.utils.functional import cached_property
 from django.utils.decorators import method_decorator
 from django.shortcuts import get_object_or_404, redirect
 
+from pkg_resources import Requirement, RequirementParseError
+
 from . import models, utils, tasks
 
 
@@ -193,34 +195,39 @@ class RequirementsResolution(RequirementsProcessingMixin,
             platform=self.platform,
         )
         return self.request.build_absolute_uri(
-            build.get_build_url(build_if_needed=True),
+            build.get_build_url(build_if_needed=True, include_digest=True),
         )
 
-    def _filter_urls(self, reqs, urls):
-        for req in reqs:
-            if req.startswith('https://') or req.startswith('http://'):
-                urls.append(self._resolve_url(req.strip()))
-                continue
-            yield req
+    def _resolve_package(self, req):
+        assert len(req.specs) == 1
+        assert req.specs[0][0] == '=='
+
+        release = models.get_release(
+            self.indexes,
+            models.normalize_package_name(req.key),
+            models.normalize_version(req.specs[0][1]),
+        )
+        build = release.get_build(self.platform)
+        return self.request.build_absolute_uri(
+            build.get_absolute_url(include_digest=True)
+        )
 
     def process_body(self, body):
-        from pkg_resources import parse_requirements
-
         urls = []
         reqs = body.splitlines()
-        reqs = parse_requirements(self._filter_urls(reqs, urls))
 
-        for req in reqs:
-            assert len(req.specs) == 1
-            assert req.specs[0][0] == '=='
+        for req in utils.split_requirements(reqs):
+            try:
+                req = Requirement(req)
+            except RequirementParseError:
+                if req.startswith('https://') or req.startswith('http://'):
+                    urls.append(self._resolve_url(req))
+                else:
+                    urls.append(req)
+            else:
+                urls.append(self._resolve_package(req))
 
-            release = models.get_release(
-                self.indexes,
-                models.normalize_package_name(req.key),
-                models.normalize_version(req.specs[0][1]),
-            )
-            build = release.get_build(self.platform)
-            url = self.request.build_absolute_uri(build.get_absolute_url())
-            urls.append(url)
-
-        return HttpResponse('\n'.join(urls), content_type='text/plain')
+        return HttpResponse(
+            u'\n'.join(urls) + u'\n',
+            content_type='text/plain'
+        )

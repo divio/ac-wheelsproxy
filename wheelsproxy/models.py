@@ -378,13 +378,19 @@ class BuildBase(models.Model):
         return bool(self.build)
     is_built.boolean = True
 
-    def get_build_url(self, build_if_needed=False):
+    def get_build_url(self, build_if_needed=False, include_digest=False):
         if self.is_built():
-            return self.build.url
+            url = self.build.url
+            if include_digest and self.md5_digest:
+                url += '#md5={}'.format(self.md5_digest)
+            return url
         else:
             if build_if_needed:
                 self.schedule_build()
-            return self.original_url
+            url = self.original_url
+            if include_digest and self.original_md5_digest:
+                url += '#md5={}'.format(self.original_md5_digest)
+            return url
 
     def rebuild(self):
         builder = self.platform.get_builder()
@@ -400,6 +406,10 @@ class BuildBase(models.Model):
 
     @property
     def original_url(self):
+        raise NotImplementedError
+
+    @property
+    def original_md5_digest(self):
         raise NotImplementedError
 
     def schedule_build(self, force=False):
@@ -430,7 +440,11 @@ class Build(BuildBase):
     def original_url(self):
         return self.release.url
 
-    def get_absolute_url(self):
+    @property
+    def original_md5_digest(self):
+        return self.release.md5_digest
+
+    def get_absolute_url(self, include_digest=False):
         if self.is_built() and not settings.ALWAYS_REDIRECT_DOWNLOADS:
             # NOTE: Return the final URL directly if the build is already
             # available and ALWAYS_REDIRECT_DOWNLOADS is set to False, so that
@@ -438,7 +452,7 @@ class Build(BuildBase):
             # This prevents us from collecting stats about package activity,
             # but given the problems we're trying to solve with the proxy,
             # this is an acceptable compromise.
-            return self.get_build_url()
+            return self.get_build_url(include_digest=include_digest)
         else:
             return reverse('wheelsproxy:download_build', kwargs={
                 'index_slugs': self.release.package.index.slug,
@@ -473,6 +487,10 @@ class ExternalBuild(BuildBase):
     @property
     def original_url(self):
         return self.external_url
+
+    @property
+    def original_md5_digest(self):
+        return None
 
 
 class CompiledRequirements(models.Model):

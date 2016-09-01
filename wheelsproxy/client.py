@@ -23,12 +23,29 @@ class PackageNotFound(Exception):
 class Release(namedtuple('Release', ['url', 'md5_digest', 'type'])):
     @staticmethod
     def guess_type(url):
+        if url.endswith('.tar.bz2'):
+            return 'sdist'
         if url.endswith('.whl'):
             return 'bdist_wheel'
-        elif url.endswith('.tar.gz'):
+        if url.endswith('.zip'):
             return 'sdist'
-        else:
-            raise ValueError('Cannot guess package type of `{}`'.format(url))
+        if url.endswith('.tar.gz'):
+            return 'sdist'
+        if url.endswith('.tgz'):
+            return 'sdist'
+
+        if url.endswith('.egg'):
+            return None
+        if url.endswith('.rpm'):
+            return None
+        if url.endswith('.exe'):
+            return None
+        if url.endswith('.msi'):
+            return None
+        if url.endswith('.dmg'):
+            return None
+
+        raise ValueError('Cannot guess package type of `{}`'.format(url))
 
 
 class IndexAPIClient(object):
@@ -143,13 +160,18 @@ class DevPIClient(IndexAPIClient):
         return list(set(self._iter_stage_packages(self.url)))
 
     def _clean_releases(self, version_details):
+        releases = (
+            (rel, Release.guess_type(rel['href']))
+            for rel in version_details.get('+links', [])
+        )
+
         return [Release(
             rel['href'],
             # TODO: Add support for hashspec and alternative hashes
             #       (newer devpi versions support sha256)
             rel.get('md5', ''),
-            Release.guess_type(rel['href']),
-        ) for rel in version_details.get('+links', [])]
+            type,
+        ) for rel, type in releases if type]
 
     def get_package_releases(self, package_name):
         url = furl.furl(self.url)

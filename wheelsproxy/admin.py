@@ -285,13 +285,13 @@ class BuildAdminBase(adminutils.ModelAdmin):
     formatted_metadata.short_description = _('metadata')
 
     def formatted_build_log(self, instance):
-        if not instance.build:
+        if not instance.build_log:
             return '-'
         return simple_code_block(instance.build_log)
     formatted_build_log.short_description = _('build log')
 
     def formatted_build_duration(self, instance):
-        if instance.is_built():
+        if instance.build_duration:
             return _('{} seconds').format(instance.build_duration)
         else:
             return '-'

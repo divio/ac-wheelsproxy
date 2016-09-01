@@ -115,6 +115,10 @@ class DevPIClient(IndexAPIClient):
         r = self.api_session.get(self.url)
         return int(r.headers['x-devpi-serial']) - 1
 
+    def master_uuid(self):
+        r = self.api_session.get(self.url)
+        return r.headers.get('x-devpi-master-uuid')
+
     def _iter_stage_packages(self, stage_url):
         r = self.api_session.get(stage_url)
         r.raise_for_status()
@@ -177,6 +181,10 @@ class DevPIClient(IndexAPIClient):
         changelog_url.path.add('+changelog')
 
         current_serial = self.changelog_last_serial()
+        master_uuid = self.master_uuid()
+
+        if master_uuid:
+            headers = {'x-devpi-expected-master-id': master_uuid}
 
         while since_serial < current_serial:
             seen_packages = set()

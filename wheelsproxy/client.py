@@ -12,6 +12,8 @@ from six.moves import xmlrpc_client, range
 
 from execnet.gateway_base import Unserializer
 
+from .utils import retry_call
+
 
 log = logging.getLogger(__name__)
 
@@ -213,7 +215,8 @@ class DevPIClient(IndexAPIClient):
             for event_serial in range(since_serial + 1, current_serial + 1):
                 url = changelog_url.copy()
                 url.path.add(str(event_serial))
-                response = self.api_session.get(url, timeout=5)
+                response = retry_call(3, self.api_session.get,
+                                      url, timeout=15, headers=headers)
                 response.raise_for_status()
 
                 event = self._load_payload(response.content)[0]

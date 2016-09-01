@@ -49,3 +49,14 @@ def split_requirements(strs):
 def parse_requirements(strs):
     for req in split_requirements(strs):
         yield Requirement(req)
+
+
+def retry_call(times, func, *args, **kwargs):
+    while True:
+        try:
+            return func(*args, **kwargs)
+        except:
+            if times:
+                times -= 1
+            else:
+                raise

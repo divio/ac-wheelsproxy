@@ -141,7 +141,9 @@ class DevPIClient(IndexAPIClient):
     def _clean_releases(self, version_details):
         return [Release(
             rel['href'],
-            rel['md5'],
+            # TODO: Add support for hashspec and alternative hashes
+            #       (newer devpi versions support sha256)
+            rel.get('md5', ''),
             Release.guess_type(rel['href']),
         ) for rel in version_details.get('+links', [])]
 

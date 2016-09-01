@@ -200,7 +200,9 @@ class Package(models.Model):
             instance.url = release.url
             instance.md5_digest = release.md5_digest
             assert instance.url
-            assert instance.md5_digest
+            # TODO: Add support for hashspec and alternative hashes
+            #       (newer devpi versions support sha256)
+            # assert instance.md5_digest
             instance.save(update_fields=['url', 'md5_digest'])
         elif release:
             instance.url = release.url

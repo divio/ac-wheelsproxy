@@ -257,3 +257,6 @@ class DevPIClient(IndexAPIClient):
 
     def handle_PYPILINKS(self, key, payload):
         pass  # Nothing to do here
+
+    def handle_PROJSIMPLELINKS(self, key, payload):
+        return key.split('/')[2]

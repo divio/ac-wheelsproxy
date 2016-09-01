@@ -123,6 +123,9 @@ class DevPIClient(IndexAPIClient):
         root_url = furl.furl(stage_url)
         root_url.path.set(root_url.path.segments[:-2])
 
+        if payload['result']['type'] == 'mirror':
+            return
+
         for base in payload['result']['bases']:
             url = root_url.copy()
             url.path.add(base.split('/'))

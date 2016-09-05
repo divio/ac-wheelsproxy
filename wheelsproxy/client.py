@@ -207,8 +207,9 @@ class DevPIClient(IndexAPIClient):
         current_serial = self.changelog_last_serial()
         master_uuid = self.master_uuid()
 
+        headers = {}
         if master_uuid:
-            headers = {'x-devpi-expected-master-id': master_uuid}
+            headers['x-devpi-expected-master-id'] = master_uuid
 
         while since_serial < current_serial:
             seen_packages = set()

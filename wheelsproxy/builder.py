@@ -50,7 +50,7 @@ def get_docker_client(dsn):
 
 def file_digest(algorithm, fh, chunk_size=4096):
     hash = algorithm()
-    for chunk in iter(lambda: fh.read(chunk_size), ''):
+    for chunk in iter(lambda: fh.read(chunk_size), b''):
         hash.update(chunk)
     return hash.hexdigest()
 
@@ -77,7 +77,7 @@ def extract_wheel_meta(fh):
             except ValueError:
                 continue
             if dirname.endswith('.dist-info') and basename == 'metadata.json':
-                return json.loads(z.read(member.filename))
+                return json.loads(z.read(member.filename).decode('utf-8'))
         else:
             return None
 
@@ -86,6 +86,38 @@ class DockerBuilder(object):
     def __init__(self, platform_spec):
         self.image = platform_spec['image']
         self.client = get_docker_client(settings.BUILDS_DOCKER_DSN)
+
+    def get_environment(self):
+        log = io.StringIO()
+        env = io.StringIO()
+
+        pycmd = '; '.join([
+            'import sys, json',
+            'from pkg_resources.extern.packaging.markers import default_environment',  # NOQA
+            'json.dump(default_environment(), sys.stdout)',
+        ])
+
+        cmd = ' '.join([
+            'python',
+            '-c',
+            shlex_quote(pycmd),
+        ])
+
+        image, tag = split_image_name(self.image)
+        consume_output(self.client.pull(image, tag, stream=True), log)
+
+        container = self.client.create_container(self.image, cmd)
+        self.client.start(container=container['Id'])
+
+        consume_output(
+            self.client.attach(container=container['Id'],
+                               stdout=True, stderr=True, stream=True),
+            env,
+        )
+
+        self.client.remove_container(container=container['Id'], v=True)
+
+        return json.loads(env.getvalue())
 
     def build(self, build):
         cmd = ' '.join([
@@ -154,14 +186,14 @@ class DockerBuilder(object):
             else:
                 raise RuntimeError('Build failed')
 
-    def compile(self, requirements):
+    def compile(self, reqs):
         from .models import COMPILATION_STATUSES
 
         cmd = ' '.join([
             'pip-compile',
             '--verbose',
             '--no-index',
-            '--index-url', requirements.index_url,
+            '--index-url', reqs.index_url,
             '/workspace/requirements.in',
         ])
 
@@ -169,7 +201,7 @@ class DockerBuilder(object):
 
         with tempdir(dir=settings.TEMP_BUILD_ROOT) as workspace:
             with open(os.path.join(workspace, 'requirements.in'), 'wb') as fh:
-                fh.write(requirements.requirements)
+                fh.write(reqs.requirements)
 
             image, tag = split_image_name(self.image)
             consume_output(
@@ -179,7 +211,7 @@ class DockerBuilder(object):
 
             cache_dir = os.path.join(
                 settings.COMPILE_CACHE_ROOT,
-                requirements.platform.slug,
+                reqs.platform.slug,
             )
             if not os.path.exists(cache_dir):
                 os.makedirs(cache_dir)
@@ -215,12 +247,12 @@ class DockerBuilder(object):
 
             self.client.remove_container(container=container['Id'], v=True)
 
-            requirements.pip_compilation_log = compile_log.getvalue()
-            requirements.pip_compilation_duration = (
+            reqs.pip_compilation_log = compile_log.getvalue()
+            reqs.pip_compilation_duration = (
                 compilation_end - compilation_start
             ).total_seconds()
-            requirements.pip_compilation_timestamp = timezone.now()
-            requirements.save(update_fields=[
+            reqs.pip_compilation_timestamp = timezone.now()
+            reqs.save(update_fields=[
                 'pip_compilation_log',
                 'pip_compilation_duration',
                 'pip_compilation_timestamp',
@@ -230,16 +262,16 @@ class DockerBuilder(object):
 
             if os.path.exists(compiled_requirements):
                 with open(compiled_requirements, 'rb') as fh:
-                    requirements.pip_compiled_requirements = fh.read()
-                    requirements.pip_compilation_status = COMPILATION_STATUSES.DONE
-                    requirements.save(update_fields=[
+                    reqs.pip_compiled_requirements = fh.read()
+                    reqs.pip_compilation_status = COMPILATION_STATUSES.DONE
+                    reqs.save(update_fields=[
                         'pip_compiled_requirements',
                         'pip_compilation_status',
                     ])
             else:
-                requirements.pip_compiled_requirements = ''
-                requirements.pip_compilation_status = COMPILATION_STATUSES.FAILED
-                requirements.save(update_fields=[
+                reqs.pip_compiled_requirements = ''
+                reqs.pip_compilation_status = COMPILATION_STATUSES.FAILED
+                reqs.save(update_fields=[
                     'pip_compiled_requirements',
                     'pip_compilation_status',
                 ])

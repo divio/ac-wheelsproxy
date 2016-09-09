@@ -19,7 +19,34 @@ from .adminutils import (
 
 @admin.register(models.Platform)
 class PlatformAdmin(adminutils.ModelAdmin):
-    pass
+    readonly_fields = (
+        'formatted_environment',
+    )
+
+    actions = (
+        'populate_environment_action',
+    )
+
+    change_actions = (
+        'populate_environment_action',
+    )
+
+    @queryset_action
+    def populate_environment_action(self, request, queryset):
+        for platform_pk in queryset.values_list('pk', flat=True):
+            tasks.populate_platform_environment.delay(platform_pk)
+    populate_environment_action.label = _('Populate environment')
+    populate_environment_action.short_description = _(
+        'Populate the environment for the selected platforms')
+
+    def formatted_environment(self, instance):
+        if instance.environment is None:
+            return '-'
+        else:
+            return simple_code_block(
+                json.dumps(instance.environment, indent=4),
+            )
+    formatted_environment.short_description = _('environment')
 
 
 @admin.register(models.BackingIndex)

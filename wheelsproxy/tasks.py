@@ -88,3 +88,23 @@ def compile(requirements_id, force=False):
         return
 
     requirements.recompile()
+
+
+@shared_task(ignore_result=True)
+def populate_platform_environment(platform_id, force=False):
+    from . import models
+    models.Platform.objects.get(pk=platform_id).populate_environment()
+
+    platform_qs = models.Platform.objects.all()
+
+    if not force:
+        platform_qs = platform_qs.filter(
+            environment__isnull=True,
+        )
+
+    try:
+        platform = platform_qs.get(pk=platform_id)
+    except models.Platform.DoesNotExist:
+        return
+
+    platform.populate_environment()

@@ -68,6 +68,7 @@ class Platform(models.Model):
     slug = models.SlugField(unique=True)
     type = models.CharField(max_length=16, choices=PLATFORM_CHOICES)
     spec = JSONField(default={})
+    environment = JSONField(null=True, editable=False)
 
     def __str__(self):
         return self.slug
@@ -77,6 +78,10 @@ class Platform(models.Model):
         # for platforms not supported by docker: OS X, Windows, ...)
         assert self.type == self.DOCKER
         return builder.DockerBuilder(self.spec)
+
+    def populate_environment(self):
+        self.environment = self.get_builder().get_environment()
+        self.save(update_fields=['environment'])
 
 
 class BackingIndex(models.Model):

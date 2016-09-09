@@ -1,2 +1,6 @@
 celerybeat-schedule*
 .data
+.junit.xml
+.coverage
+.cache
+.htmlcov

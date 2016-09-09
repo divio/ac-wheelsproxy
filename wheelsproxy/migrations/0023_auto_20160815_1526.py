@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('md5_digest', models.CharField(blank=True, default=b'', editable=False, max_length=32, verbose_name='MD5 digest')),
-                ('build', models.FileField(blank=True, max_length=255, null=True, storage=wheelsproxy.storage.dsn_configured_storage(b'BUILDS_STORAGE_DSN'), upload_to=wheelsproxy.models.upload_build_to)),
+                ('build', models.FileField(blank=True, max_length=255, null=True, storage=wheelsproxy.storage.dsn_configured_storage('BUILDS_STORAGE_DSN'), upload_to=wheelsproxy.models.upload_build_to)),
                 ('metadata', django.contrib.postgres.fields.jsonb.JSONField(blank=True, editable=False, null=True)),
                 ('filesize', models.PositiveIntegerField(blank=True, editable=False, null=True)),
                 ('build_timestamp', models.DateTimeField(blank=True, editable=False, null=True)),

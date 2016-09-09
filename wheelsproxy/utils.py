@@ -13,6 +13,14 @@ def parse_requirement(s):
     return Requirement.parse(''.join(match.groups(default='')))
 
 
+def normalize_package_name(package_name):
+    return re.sub(r'(\.|-|_)+', '-', package_name.lower())
+
+
+def normalize_version(version):
+    return safe_version(version)
+
+
 class UniquesIterator(object):
     def __init__(self, key=None):
         self.seen = set()

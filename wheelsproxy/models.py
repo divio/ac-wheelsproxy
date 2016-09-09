@@ -1,6 +1,5 @@
 import os
 import logging
-import re
 import hashlib
 
 import six
@@ -33,14 +32,6 @@ COMPILATION_STATUSES = Choices(
     ('DONE', 'done', _('Done')),
     ('FAILED', 'failed', _('Failed')),
 )
-
-
-def normalize_package_name(package_name):
-    return re.sub(r'(\.|-|_)+', '-', package_name.lower())
-
-
-def normalize_version(version):
-    return safe_version(version)
 
 
 def get_release(indexes, package_slug, version):
@@ -122,7 +113,7 @@ class BackingIndex(models.Model):
             if package_name:
                 if not self.import_package(package_name):
                     # Nothing imported: remove the package
-                    slug = normalize_package_name(package_name)
+                    slug = utils.normalize_package_name(package_name)
                     Package.objects.filter(index=self, slug=slug).delete()
                     cache.delete(
                         Package.get_cache_version_key(self.slug, slug),
@@ -191,7 +182,7 @@ class Package(models.Model):
                     return release
 
     def get_release(self, version, release=None):
-        version = normalize_version(version)
+        version = utils.normalize_version(version)
         instance, created = Release.objects.get_or_create(
             package=self, version=version)
         if created:

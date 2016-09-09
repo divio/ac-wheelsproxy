@@ -29,7 +29,7 @@ class PackageViewMixin(object):
 
     @cached_property
     def package_name(self):
-        return models.normalize_package_name(self.kwargs['package_name'])
+        return utils.normalize_package_name(self.kwargs['package_name'])
 
     @cached_property
     def platform(self):
@@ -125,7 +125,7 @@ class BuildTrigger(PackageViewMixin, RedirectView):
 
     @cached_property
     def version(self):
-        return models.normalize_version(self.kwargs.get('version'))
+        return utils.normalize_version(self.kwargs.get('version'))
 
     @cached_property
     def build(self):
@@ -204,8 +204,8 @@ class RequirementsResolution(RequirementsProcessingMixin,
 
         release = models.get_release(
             self.indexes,
-            models.normalize_package_name(req.key),
-            models.normalize_version(req.specs[0][1]),
+            utils.normalize_package_name(req.key),
+            utils.normalize_version(req.specs[0][1]),
         )
         build = release.get_build(self.platform)
         return self.request.build_absolute_uri(

@@ -1,3 +1,5 @@
+import six
+
 from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.core.cache import cache as cache_backend
@@ -89,7 +91,7 @@ class PackageLinks(PackageViewMixin, TemplateView):
 
             # Render the normal response
             response = super(PackageLinks, self).get(request, *args, **kwargs)
-            if hasattr(response, 'render') and callable(response.render):
+            if hasattr(response, 'render') and six.callable(response.render):
                 response.render()
             cache.set(cache_key, response, timeout=None)
         return response
@@ -171,8 +173,10 @@ class RequirementsCompilationView(RequirementsProcessingMixin,
             platform=self.platform,
             requirements=body,
             index_url=index_url,
+            index_slugs=[i.slug for i in self.indexes],
         )
-        tasks.compile.delay(reqs.pk).get()
+        tasks.internal_compile.delay(reqs.pk)
+        tasks.pip_compile.delay(reqs.pk).get(propagate=False)
         reqs = models.CompiledRequirements.objects.get(pk=reqs.pk)
         if reqs.is_compiled():
             return HttpResponse(
@@ -181,7 +185,7 @@ class RequirementsCompilationView(RequirementsProcessingMixin,
             )
         else:
             return HttpResponseBadRequest(
-                'Requirements could not be compiled (#{})'.format(reqs.pk),
+                reqs.pip_compilation_log,
                 content_type='text/plain',
             )
 

@@ -9,6 +9,8 @@ machine:
     version: 3.5.1
   services:
     - docker
+    - redis
+    - postgresql
   environment:
     GIT_EMAIL: circleci@aldryn.com
     GIT_USERNAME: "Circle CI Bot"
@@ -16,6 +18,11 @@ machine:
     DOCKER_USERNAME: aldrynserver
     IMAGE_NAME: divio/ac-wheelsproxy
     VERSION: 2.$CIRCLE_BUILD_NUM
+    DATABASES_DEFAULT: postgres://postgres@localhost/circleci
+    CELERY_BROKER_URL: redis://127.0.0.1:6379/1
+    CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/2
+    BUILDS_DOCKER_DSN: ''  # TODO
+    BUILDS_STORAGE_DSN: file:///data
 
 
 dependencies:

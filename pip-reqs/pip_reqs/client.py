@@ -1,6 +1,10 @@
 import requests
 
 
+class CompilationError(Exception):
+    pass
+
+
 class WheelsproxyClient(object):
     def __init__(self, base_url):
         self.base_url = base_url
@@ -11,6 +15,8 @@ class WheelsproxyClient(object):
             self.base_url + '+compile/',
             data=requirements_in,
         )
+        if r.status_code == requests.codes.bad_request:
+            raise CompilationError(r.content)
         r.raise_for_status()
         return r.content
 

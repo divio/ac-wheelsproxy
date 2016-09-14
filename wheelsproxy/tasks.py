@@ -72,7 +72,7 @@ def sync_indexes():
 
 
 @shared_task
-def compile(requirements_id, force=False):
+def pip_compile(requirements_id, force=False):
     from . import models
 
     requirements_qs = models.CompiledRequirements.objects.all()
@@ -87,4 +87,43 @@ def compile(requirements_id, force=False):
     except models.CompiledRequirements.DoesNotExist:
         return
 
-    requirements.recompile()
+    requirements.pip_recompile()
+
+
+@shared_task
+def internal_compile(requirements_id, force=False):
+    from . import models
+
+    requirements_qs = models.CompiledRequirements.objects.all()
+
+    if not force:
+        requirements_qs = requirements_qs.filter(
+            internal_compilation_status=models.COMPILATION_STATUSES.PENDING,
+        )
+
+    try:
+        requirements = requirements_qs.get(pk=requirements_id)
+    except models.CompiledRequirements.DoesNotExist:
+        return
+
+    requirements.internal_recompile()
+
+
+@shared_task(ignore_result=True)
+def populate_platform_environment(platform_id, force=False):
+    from . import models
+    models.Platform.objects.get(pk=platform_id).populate_environment()
+
+    platform_qs = models.Platform.objects.all()
+
+    if not force:
+        platform_qs = platform_qs.filter(
+            environment__isnull=True,
+        )
+
+    try:
+        platform = platform_qs.get(pk=platform_id)
+    except models.Platform.DoesNotExist:
+        return
+
+    platform.populate_environment()

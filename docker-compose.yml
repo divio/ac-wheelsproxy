@@ -13,6 +13,7 @@ services:
       - "${PWD}/.data/tmp:${PWD}/.data/tmp"
       - "${PWD}/.data/cache:${PWD}/.data/cache"
       - "${DOCKER_CERT_PATH}:/certs"
+      - "~/.toxenvs/wheelsproxy-docker:/root/.toxenvs/wheelsproxy"
     env_file:
       - ".env.localdev"
     environment:

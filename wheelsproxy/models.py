@@ -1,23 +1,28 @@
 import os
+import time
 import logging
-import re
 import hashlib
 
 import six
-from pkg_resources import parse_version, safe_version
+
+from pkg_resources import parse_version, Requirement, safe_extra
+from pkg_resources.extern.packaging.markers import Marker
+
+import furl
 
 from django.db import models
 from django.core.cache import cache
 from django.core.urlresolvers import reverse
 from django.conf import settings
+from django.utils import timezone
 from django.utils.translation import ugettext_lazy as _
 from django.utils.functional import cached_property
 from django.utils.module_loading import import_string
-from django.contrib.postgres.fields import JSONField
+from django.contrib.postgres.fields import JSONField, ArrayField
 
 from extended_choices import Choices
 
-from . import storage, tasks, builder, utils, client
+from . import storage, tasks, builder, utils, client, depgraph
 
 
 log = logging.getLogger(__name__)
@@ -33,14 +38,6 @@ COMPILATION_STATUSES = Choices(
     ('DONE', 'done', _('Done')),
     ('FAILED', 'failed', _('Failed')),
 )
-
-
-def normalize_package_name(package_name):
-    return re.sub(r'(\.|-|_)+', '-', package_name.lower())
-
-
-def normalize_version(version):
-    return safe_version(version)
 
 
 def get_release(indexes, package_slug, version):
@@ -68,6 +65,7 @@ class Platform(models.Model):
     slug = models.SlugField(unique=True)
     type = models.CharField(max_length=16, choices=PLATFORM_CHOICES)
     spec = JSONField(default={})
+    environment = JSONField(null=True, editable=False)
 
     def __str__(self):
         return self.slug
@@ -77,6 +75,17 @@ class Platform(models.Model):
         # for platforms not supported by docker: OS X, Windows, ...)
         assert self.type == self.DOCKER
         return builder.DockerBuilder(self.spec)
+
+    def populate_environment(self):
+        self.environment = self.get_builder().get_environment()
+        self.save(update_fields=['environment'])
+
+    def get_external_build(self, url):
+        build, created = ExternalBuild.objects.get_or_create(
+            platform=self,
+            external_url=url,
+        )
+        return build
 
 
 class BackingIndex(models.Model):
@@ -101,13 +110,16 @@ class BackingIndex(models.Model):
 
     client = cached_property(get_client)
 
-    def get_package(self, package_name):
-        normalized_package_name = normalize_package_name(package_name)
-        package, created = Package.objects.get_or_create(
-            index=self,
-            slug=normalized_package_name,
-            defaults={'name': package_name},
-        )
+    def get_package(self, package_name, create=True):
+        normalized_package_name = utils.normalize_package_name(package_name)
+        if create:
+            package, created = Package.objects.get_or_create(
+                index=self,
+                slug=normalized_package_name,
+                defaults={'name': package_name},
+            )
+        else:
+            package = self.package_set.get(slug=normalized_package_name)
         return package
 
     def itersync(self):
@@ -117,7 +129,7 @@ class BackingIndex(models.Model):
             if package_name:
                 if not self.import_package(package_name):
                     # Nothing imported: remove the package
-                    slug = normalize_package_name(package_name)
+                    slug = utils.normalize_package_name(package_name)
                     Package.objects.filter(index=self, slug=slug).delete()
                     cache.delete(
                         Package.get_cache_version_key(self.slug, slug),
@@ -186,7 +198,7 @@ class Package(models.Model):
                     return release
 
     def get_release(self, version, release=None):
-        version = normalize_version(version)
+        version = utils.normalize_version(version)
         instance, created = Release.objects.get_or_create(
             package=self, version=version)
         if created:
@@ -303,6 +315,10 @@ class Release(models.Model):
     def parsed_version(self):
         return parse_version(self.version)
 
+    @property
+    def requirement(self):
+        return Requirement('{}=={}'.format(self.package.slug, self.version))
+
 
 def upload_build_to(self, filename):
     return '{index}/{platform}/{package}/{version}/{filename}'.format(
@@ -365,16 +381,35 @@ class BuildBase(models.Model):
     @property
     def requirements(self):
         if self.metadata:
-            for requirements in self.metadata.get('run_requires', []):
-                if 'extra' not in requirements:
-                    return {
-                        utils.parse_requirement(r)
-                        for r in requirements['requires']
-                    }
-            else:
-                return []
+            return list(self.iter_requirements())
         else:
             return None
+
+    def iter_requirements(self, extras=None):
+        assert self.metadata
+
+        meta = self.metadata
+        extras = extras if extras else frozenset([])
+        env = self.platform.environment
+
+        def process(requirement_sets, extras, environment):
+            for requirements in requirement_sets:
+                if 'extra' in requirements:
+                    if safe_extra(requirements['extra']) not in extras:
+                        continue
+
+                if 'environment' in requirements:
+                    marker = Marker(requirements['environment'])
+                    if not marker.evaluate(environment):
+                        continue
+
+                for req in requirements['requires']:
+                    req = utils.parse_requirement(req)
+                    req.extras = extras
+                    yield Requirement(str(req))
+
+        yield from process(meta.get('run_requires', []), extras, env)
+        yield from process(meta.get('meta_requires', []), extras, env)
 
     def is_built(self):
         return bool(self.build)
@@ -414,7 +449,14 @@ class BuildBase(models.Model):
     def original_md5_digest(self):
         raise NotImplementedError
 
+    @property
+    def package_name(self):
+        raise NotImplementedError
+
     def schedule_build(self, force=False):
+        raise NotImplementedError
+
+    def is_external(self):
         raise NotImplementedError
 
 
@@ -431,12 +473,19 @@ class Build(BuildBase):
     class Meta:
         unique_together = ('release', 'platform')
 
+    def is_external(self):
+        return False
+
     def schedule_build(self, force=False):
         return tasks.build_internal.delay(self.pk, force=force)
 
     def rebuild(self):
         super(Build, self).rebuild()
         self.release.package.expire_cache()
+
+    @property
+    def package_name(self):
+        return self.release.package.name
 
     @property
     def original_url(self):
@@ -483,6 +532,17 @@ class ExternalBuild(BuildBase):
     class Meta:
         unique_together = ('external_url', 'platform')
 
+    @property
+    def package_name(self):
+        return furl.furl(self.external_url).fragment.args['egg'].split('==')[0]
+
+    @property
+    def version(self):
+        return furl.furl(self.external_url).fragment.args['egg'].split('==')[1]
+
+    def is_external(self):
+        return True
+
     def schedule_build(self, force=False):
         return tasks.build_external.delay(self.pk, force=force)
 
@@ -499,6 +559,7 @@ class CompiledRequirements(models.Model):
     platform = models.ForeignKey(Platform)
     requirements = models.TextField()
     index_url = models.URLField()
+    index_slugs = ArrayField(models.SlugField())
     created_at = models.DateTimeField(auto_now_add=True)
 
     pip_compilation_status = models.CharField(
@@ -516,7 +577,8 @@ class CompiledRequirements(models.Model):
         blank=True, null=True,
         editable=False,
     )
-    pip_compilation_log = models.TextField(blank=True, editable=False)
+    pip_compilation_log = models.TextField(
+        _('Compilation log'), blank=True, editable=False)
 
     internal_compilation_status = models.CharField(
         max_length=12,
@@ -535,17 +597,57 @@ class CompiledRequirements(models.Model):
         blank=True, null=True,
         editable=False,
     )
-    internal_compilation_log = models.TextField(blank=True, editable=False)
+    internal_compilation_log = models.TextField(
+        _('Compilation log'), blank=True, editable=False)
 
-    def is_pending(self):
-        return self.pip_compilation_status == COMPILATION_STATUSES.PENDING
+    def _mode_attr(self, mode, attr):
+        return getattr(self, '{}_{}'.format(mode, attr))
 
-    def is_failed(self):
-        return self.pip_compilation_status == COMPILATION_STATUSES.FAILED
+    def is_pending(self, mode='pip'):
+        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.PENDING  # NOQA
 
-    def is_compiled(self):
-        return self.pip_compilation_status == COMPILATION_STATUSES.DONE
+    def is_failed(self, mode='pip'):
+        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.FAILED  # NOQA
 
-    def recompile(self):
+    def is_compiled(self, mode='pip'):
+        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.DONE  # NOQA
+
+    def pip_recompile(self):
         builder = self.platform.get_builder()
         builder.compile(self)
+
+    def internal_recompile(self):
+        start = time.time()
+
+        indexes = BackingIndex.objects.filter(slug__in=self.index_slugs)
+        indexes = sorted(indexes, key=lambda i: self.index_slugs.index(i.slug))
+
+        graph = depgraph.DependencyGraph(indexes, self.platform)
+
+        try:
+            graph.compile(self.requirements)
+        except depgraph.CompilationFailed:
+            self.internal_compilation_status = COMPILATION_STATUSES.FAILED
+            raise
+        else:
+            formatter = depgraph.GraphFormatter(header_comment=(
+                '# This file is autogenerated by wheelsproxy.\n'
+                '# Make changes in requirements.in, then submit it to the\n'
+                '# wheelsproxy to update:\n'
+                '#\n'
+                '#    pip-reqs -w {} compile\n'
+                '#\n'
+            ).format(self.index_url))
+            self.internal_compiled_requirements = formatter.format(graph)
+            self.internal_compilation_status = COMPILATION_STATUSES.DONE
+        finally:
+            self.internal_compilation_log = graph.get_last_log()
+            self.internal_compilation_timestamp = timezone.now()
+            self.internal_compilation_duration = time.time() - start
+            self.save(update_fields=[
+                'internal_compiled_requirements',
+                'internal_compilation_status',
+                'internal_compilation_timestamp',
+                'internal_compilation_log',
+                'internal_compilation_duration',
+            ])

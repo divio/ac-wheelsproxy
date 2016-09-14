@@ -1,5 +1,6 @@
-FROM aldryn/base:3.15
+FROM aldryn/base:py3-3.17
 RUN mkdir -p /app
+RUN pipsi install tox
 WORKDIR /app
 ADD requirements.txt /app/
 RUN pip install --use-wheel --no-deps -r requirements.txt

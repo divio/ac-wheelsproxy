@@ -1,3 +1,5 @@
+import six
+
 from django.db import transaction
 from django.http import Http404, HttpResponse, HttpResponseBadRequest
 from django.core.cache import cache as cache_backend
@@ -29,7 +31,7 @@ class PackageViewMixin(object):
 
     @cached_property
     def package_name(self):
-        return models.normalize_package_name(self.kwargs['package_name'])
+        return utils.normalize_package_name(self.kwargs['package_name'])
 
     @cached_property
     def platform(self):
@@ -89,7 +91,7 @@ class PackageLinks(PackageViewMixin, TemplateView):
 
             # Render the normal response
             response = super(PackageLinks, self).get(request, *args, **kwargs)
-            if hasattr(response, 'render') and callable(response.render):
+            if hasattr(response, 'render') and six.callable(response.render):
                 response.render()
             cache.set(cache_key, response, timeout=None)
         return response
@@ -125,7 +127,7 @@ class BuildTrigger(PackageViewMixin, RedirectView):
 
     @cached_property
     def version(self):
-        return models.normalize_version(self.kwargs.get('version'))
+        return utils.normalize_version(self.kwargs.get('version'))
 
     @cached_property
     def build(self):
@@ -171,8 +173,10 @@ class RequirementsCompilationView(RequirementsProcessingMixin,
             platform=self.platform,
             requirements=body,
             index_url=index_url,
+            index_slugs=[i.slug for i in self.indexes],
         )
-        tasks.compile.delay(reqs.pk).get()
+        tasks.internal_compile.delay(reqs.pk)
+        tasks.pip_compile.delay(reqs.pk).get(propagate=False)
         reqs = models.CompiledRequirements.objects.get(pk=reqs.pk)
         if reqs.is_compiled():
             return HttpResponse(
@@ -181,7 +185,7 @@ class RequirementsCompilationView(RequirementsProcessingMixin,
             )
         else:
             return HttpResponseBadRequest(
-                'Requirements could not be compiled (#{})'.format(reqs.pk),
+                reqs.pip_compilation_log,
                 content_type='text/plain',
             )
 
@@ -204,8 +208,8 @@ class RequirementsResolution(RequirementsProcessingMixin,
 
         release = models.get_release(
             self.indexes,
-            models.normalize_package_name(req.key),
-            models.normalize_version(req.specs[0][1]),
+            utils.normalize_package_name(req.key),
+            utils.normalize_version(req.specs[0][1]),
         )
         build = release.get_build(self.platform)
         return self.request.build_absolute_uri(

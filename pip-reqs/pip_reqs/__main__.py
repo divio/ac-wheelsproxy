@@ -1,6 +1,6 @@
 import click
 
-from .client import WheelsproxyClient
+from .client import WheelsproxyClient, CompilationError
 from .parser import RequirementsParser
 
 
@@ -12,22 +12,27 @@ def main(ctx, wheelsproxy):
 
 
 @main.command()
-@click.pass_obj
+@click.pass_context
 @click.argument('infile', default='requirements.in', required=False,
                 type=click.Path(exists=True))
 @click.argument('outfile', default='requirements.txt', required=False,
                 type=click.File('wb', lazy=True))
-def compile(obj, infile, outfile):
+def compile(ctx, infile, outfile):
     parser = RequirementsParser()
     ext_reqs, local_reqs = parser.parse(infile)
-    compiled_reqs = obj.compile(b'\n'.join(ext_reqs))
+    try:
+        compiled_reqs = ctx.obj.compile(b'\n'.join(ext_reqs))
+    except CompilationError as e:
+        click.echo(e.args[0], err=True)
+        ctx.exit(1)
     outfile.write(compiled_reqs)
-    outfile.write(b'\n'.join([
-        b'',
-        b'# The following packages are available only locally.',
-        b'# Their dependencies *have* been considered while',
-        b'# resolving the full dependency tree:',
-    ] + local_reqs))
+    if local_reqs:
+        outfile.write(b'\n'.join([
+            b'',
+            b'# The following packages are available only locally.',
+            b'# Their dependencies *have* been considered while',
+            b'# resolving the full dependency tree:',
+        ] + local_reqs))
     outfile.write(b'\n')
 
 

@@ -1,15 +1,25 @@
 import re
 
-from pkg_resources import Requirement
-from pkg_resources import yield_lines
+import furl
+
+from pkg_resources import Requirement, yield_lines, safe_version
 
 
-REQ_REGEX = re.compile(r'^(?P<name>[\S]+)(?: \((?P<version>[^\)]+)\))?$')
+REQ_REGEXES = [
+    # name (specs,...)
+    re.compile(r'^(?P<name>[\S]+)(?: \((?P<version>[^\)]+)\))?$'),
+    # name op single spec
+    re.compile(r'^(?P<name>[\S]+) (?P<spec>[\S]+) (?P<version>[\S]+)$'),
+]
 
 
 def parse_requirement(s):
-    match = REQ_REGEX.match(s)
-    assert match
+    for regex in REQ_REGEXES:
+        match = regex.match(s)
+        if match:
+            break
+    else:
+        raise ValueError('Invalid dependency specifier')
     return Requirement.parse(''.join(match.groups(default='')))
 
 
@@ -56,6 +66,16 @@ def split_requirements(strs):
 
 def parse_requirements(strs):
     for req in split_requirements(strs):
+        try:
+            url = furl.furl(req)
+        except:
+            pass
+        else:
+            if url.scheme:
+                req = url.fragment.args['egg'].split('==')[0]
+                yield Requirement('{}@{}'.format(req, url))
+                continue
+
         yield Requirement(req)
 
 

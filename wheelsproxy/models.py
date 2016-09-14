@@ -3,7 +3,11 @@ import logging
 import hashlib
 
 import six
-from pkg_resources import parse_version, safe_version
+
+from pkg_resources import parse_version, Requirement, safe_extra
+from pkg_resources.extern.packaging.markers import Marker
+
+import furl
 
 from django.db import models
 from django.core.cache import cache
@@ -74,6 +78,13 @@ class Platform(models.Model):
         self.environment = self.get_builder().get_environment()
         self.save(update_fields=['environment'])
 
+    def get_external_build(self, url):
+        build, created = ExternalBuild.objects.get_or_create(
+            platform=self,
+            external_url=url,
+        )
+        return build
+
 
 class BackingIndex(models.Model):
     slug = models.SlugField(unique=True)
@@ -97,13 +108,16 @@ class BackingIndex(models.Model):
 
     client = cached_property(get_client)
 
-    def get_package(self, package_name):
-        normalized_package_name = normalize_package_name(package_name)
-        package, created = Package.objects.get_or_create(
-            index=self,
-            slug=normalized_package_name,
-            defaults={'name': package_name},
-        )
+    def get_package(self, package_name, create=True):
+        normalized_package_name = utils.normalize_package_name(package_name)
+        if create:
+            package, created = Package.objects.get_or_create(
+                index=self,
+                slug=normalized_package_name,
+                defaults={'name': package_name},
+            )
+        else:
+            package = self.package_set.get(slug=normalized_package_name)
         return package
 
     def itersync(self):
@@ -299,6 +313,10 @@ class Release(models.Model):
     def parsed_version(self):
         return parse_version(self.version)
 
+    @property
+    def requirement(self):
+        return Requirement('{}=={}'.format(self.package.slug, self.version))
+
 
 def upload_build_to(self, filename):
     return '{index}/{platform}/{package}/{version}/{filename}'.format(
@@ -361,16 +379,35 @@ class BuildBase(models.Model):
     @property
     def requirements(self):
         if self.metadata:
-            for requirements in self.metadata.get('run_requires', []):
-                if 'extra' not in requirements:
-                    return {
-                        utils.parse_requirement(r)
-                        for r in requirements['requires']
-                    }
-            else:
-                return []
+            return list(self.iter_requirements())
         else:
             return None
+
+    def iter_requirements(self, extras=None):
+        assert self.metadata
+
+        meta = self.metadata
+        extras = extras if extras else frozenset([])
+        env = self.platform.environment
+
+        def process(requirement_sets, extras, environment):
+            for requirements in requirement_sets:
+                if 'extra' in requirements:
+                    if safe_extra(requirements['extra']) not in extras:
+                        continue
+
+                if 'environment' in requirements:
+                    marker = Marker(requirements['environment'])
+                    if not marker.evaluate(environment):
+                        continue
+
+                for req in requirements['requires']:
+                    req = utils.parse_requirement(req)
+                    req.extras = extras
+                    yield Requirement(str(req))
+
+        yield from process(meta.get('run_requires', []), extras, env)
+        yield from process(meta.get('meta_requires', []), extras, env)
 
     def is_built(self):
         return bool(self.build)
@@ -410,7 +447,14 @@ class BuildBase(models.Model):
     def original_md5_digest(self):
         raise NotImplementedError
 
+    @property
+    def package_name(self):
+        raise NotImplementedError
+
     def schedule_build(self, force=False):
+        raise NotImplementedError
+
+    def is_external(self):
         raise NotImplementedError
 
 
@@ -427,12 +471,19 @@ class Build(BuildBase):
     class Meta:
         unique_together = ('release', 'platform')
 
+    def is_external(self):
+        return False
+
     def schedule_build(self, force=False):
         return tasks.build_internal.delay(self.pk, force=force)
 
     def rebuild(self):
         super(Build, self).rebuild()
         self.release.package.expire_cache()
+
+    @property
+    def package_name(self):
+        return self.release.package.name
 
     @property
     def original_url(self):
@@ -478,6 +529,13 @@ class ExternalBuild(BuildBase):
 
     class Meta:
         unique_together = ('external_url', 'platform')
+
+    @property
+    def package_name(self):
+        return furl.furl(self.external_url).fragment.args['egg'].split('==')[0]
+
+    def is_external(self):
+        return True
 
     def schedule_build(self, force=False):
         return tasks.build_external.delay(self.pk, force=force)

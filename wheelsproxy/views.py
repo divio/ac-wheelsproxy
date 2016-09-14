@@ -218,7 +218,7 @@ class RequirementsResolution(RequirementsProcessingMixin,
 
     def process_body(self, body):
         urls = []
-        reqs = body.splitlines()
+        reqs = body.decode('utf-8').splitlines()
 
         for req in utils.split_requirements(reqs):
             try:

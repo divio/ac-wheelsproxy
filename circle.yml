@@ -5,6 +5,8 @@ machine:
     - curl -L https://github.com/docker/compose/releases/download/1.8.0/docker-compose-`uname -s`-`uname -m` > ~/bin/docker-compose
     - chmod +x ~/bin/docker-compose
     - docker-compose --version
+  python:
+    version: 3.5.1
   services:
     - docker
   environment:
@@ -20,7 +22,6 @@ dependencies:
   override:
     - echo $VERSION >VERSION
     - docker login -e "$DOCKER_EMAIL" -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
-    - docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$VERSION .
 
 
 test:
@@ -33,6 +34,7 @@ deployment:
   production:
     branch: master
     commands:
+      - docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$VERSION .
       - git config user.email "$GIT_EMAIL" && git config user.name "$GIT_USERNAME"
       - git tag -m "Release version $VERSION" -m "$CIRCLE_COMPARE_URL" -m "$CIRCLE_BUILD_URL" $VERSION
       - git push origin $VERSION

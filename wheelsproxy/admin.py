@@ -396,9 +396,42 @@ class CompiledRequirementsAdmin(adminutils.ModelAdmin):
         'formatted_pip_compilation_status',
     )
     readonly_fields = (
+        'created_at',
         'formatted_pip_compilation_status',
         'formatted_pip_compiled_requirements',
         'formatted_pip_compilation_log',
+        'pip_compilation_timestamp',
+        'formatted_internal_compilation_status',
+        'formatted_internal_compiled_requirements',
+        'formatted_internal_compilation_log',
+        'internal_compilation_timestamp',
+    )
+    fieldsets = (
+        ('Input', {
+            'fields': (
+                'index_url',
+                'index_slugs',
+                'platform',
+                'created_at',
+                'requirements',
+            ),
+        }),
+        ('Output (pip)', {
+            'fields': (
+                'formatted_pip_compilation_status',
+                'formatted_pip_compiled_requirements',
+                'formatted_pip_compilation_log',
+                'pip_compilation_timestamp',
+            ),
+        }),
+        ('Output (internal)', {
+            'fields': (
+                'formatted_internal_compilation_status',
+                'formatted_internal_compiled_requirements',
+                'formatted_internal_compilation_log',
+                'internal_compilation_timestamp',
+            ),
+        }),
     )
 
     actions = (
@@ -409,33 +442,57 @@ class CompiledRequirementsAdmin(adminutils.ModelAdmin):
     )
 
     @queryset_action
-    @options(label=_('Recompile (pip)'),
+    @options(label=_('Recompile'),
              desc=_('Trigger a recompile for the selected requirements'))
     def recompile_action(self, request, queryset):
         queryset.update(
             pip_compilation_status=models.COMPILATION_STATUSES.PENDING,
+            internal_compilation_status=models.COMPILATION_STATUSES.PENDING,
         )
         for requirements_pk in queryset.values_list('pk', flat=True):
-            tasks.compile.delay(requirements_pk, force=True)
+            tasks.pip_compile.delay(requirements_pk, force=True)
+            tasks.internal_compile.delay(requirements_pk, force=True)
 
-    @options(desc=_('Compilation log (pip)'))
+    @options(desc=_('Compilation log'))
     def formatted_pip_compilation_log(self, instance):
-        if instance.is_pending():
+        if instance.is_pending(mode='pip'):
             return '-'
         return simple_code_block(instance.pip_compilation_log)
 
-    @options(desc=_('Compiled requirements (pip)'))
+    @options(desc=_('Compiled requirements'))
     def formatted_pip_compiled_requirements(self, instance):
-        if not instance.is_compiled():
+        if not instance.is_compiled(mode='pip'):
             return '-'
         return simple_code_block(instance.pip_compiled_requirements)
 
-    @options(desc=_('Compilation status (pip)'))
+    @options(desc=_('Compilation status'))
     def formatted_pip_compilation_status(self, instance):
         duration = instance.pip_compilation_duration
-        if instance.is_failed():
+        if instance.is_failed(mode='pip'):
             return _('Failed in {} seconds').format(duration)
-        elif instance.is_compiled():
+        elif instance.is_compiled(mode='pip'):
+            return _('Succeeded in {} seconds').format(duration)
+        else:
+            return _('Pending')
+
+    @options(desc=_('Compilation log'))
+    def formatted_internal_compilation_log(self, instance):
+        if instance.is_pending(mode='internal'):
+            return '-'
+        return simple_code_block(instance.internal_compilation_log)
+
+    @options(desc=_('Compiled requirements'))
+    def formatted_internal_compiled_requirements(self, instance):
+        if not instance.is_compiled(mode='internal'):
+            return '-'
+        return simple_code_block(instance.internal_compiled_requirements)
+
+    @options(desc=_('Compilation status'))
+    def formatted_internal_compilation_status(self, instance):
+        duration = instance.internal_compilation_duration
+        if instance.is_failed(mode='internal'):
+            return _('Failed in {} seconds').format(duration)
+        elif instance.is_compiled(mode='internal'):
             return _('Succeeded in {} seconds').format(duration)
         else:
             return _('Pending')

@@ -197,16 +197,17 @@ class DockerBuilder(object):
             '/workspace/requirements.in',
         ])
 
-        compile_log = io.StringIO()
+        compilation_log = io.StringIO()
+        compilation_start = timezone.now()
 
         with tempdir(dir=settings.TEMP_BUILD_ROOT) as workspace:
-            with open(os.path.join(workspace, 'requirements.in'), 'wb') as fh:
+            with open(os.path.join(workspace, 'requirements.in'), 'w') as fh:
                 fh.write(reqs.requirements)
 
             image, tag = split_image_name(self.image)
             consume_output(
                 self.client.pull(image, tag, stream=True),
-                compile_log,
+                compilation_log,
             )
 
             cache_dir = os.path.join(
@@ -236,18 +237,17 @@ class DockerBuilder(object):
                 }),
             )
 
-            compilation_start = timezone.now()
             self.client.start(container=container['Id'])
             consume_output(
                 self.client.attach(container=container['Id'],
                                    stdout=True, stderr=True, stream=True),
-                compile_log,
+                compilation_log,
             )
-            compilation_end = timezone.now()
 
             self.client.remove_container(container=container['Id'], v=True)
 
-            reqs.pip_compilation_log = compile_log.getvalue()
+            reqs.pip_compilation_log = compilation_log.getvalue()
+            compilation_end = timezone.now()
             reqs.pip_compilation_duration = (
                 compilation_end - compilation_start
             ).total_seconds()
@@ -261,7 +261,7 @@ class DockerBuilder(object):
             compiled_requirements = os.path.join(workspace, 'requirements.txt')
 
             if os.path.exists(compiled_requirements):
-                with open(compiled_requirements, 'rb') as fh:
+                with open(compiled_requirements, 'r') as fh:
                     reqs.pip_compiled_requirements = fh.read()
                     reqs.pip_compilation_status = COMPILATION_STATUSES.DONE
                     reqs.save(update_fields=[

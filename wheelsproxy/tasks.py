@@ -72,7 +72,7 @@ def sync_indexes():
 
 
 @shared_task
-def compile(requirements_id, force=False):
+def pip_compile(requirements_id, force=False):
     from . import models
 
     requirements_qs = models.CompiledRequirements.objects.all()
@@ -87,7 +87,26 @@ def compile(requirements_id, force=False):
     except models.CompiledRequirements.DoesNotExist:
         return
 
-    requirements.recompile()
+    requirements.pip_recompile()
+
+
+@shared_task
+def internal_compile(requirements_id, force=False):
+    from . import models
+
+    requirements_qs = models.CompiledRequirements.objects.all()
+
+    if not force:
+        requirements_qs = requirements_qs.filter(
+            internal_compilation_status=models.COMPILATION_STATUSES.PENDING,
+        )
+
+    try:
+        requirements = requirements_qs.get(pk=requirements_id)
+    except models.CompiledRequirements.DoesNotExist:
+        return
+
+    requirements.internal_recompile()
 
 
 @shared_task(ignore_result=True)

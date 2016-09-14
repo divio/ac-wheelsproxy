@@ -25,7 +25,8 @@ dependencies:
 
 test:
   override:
-    - echo "OK"
+    - pip install tox
+    - tox
 
 
 deployment:

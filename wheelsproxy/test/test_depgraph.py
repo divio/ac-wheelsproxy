@@ -61,6 +61,9 @@ class Build(object):
 
 
 class Index(object):
+    slug = 'test-index'
+    url = 'https://index.example.com'
+
     def __init__(self, releases):
         self.distributions = {}
         for rel in releases:

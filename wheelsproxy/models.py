@@ -604,13 +604,13 @@ class CompiledRequirements(models.Model):
         return getattr(self, '{}_{}'.format(mode, attr))
 
     def is_pending(self, mode='pip'):
-        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.PENDING
+        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.PENDING  # NOQA
 
     def is_failed(self, mode='pip'):
-        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.FAILED
+        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.FAILED  # NOQA
 
     def is_compiled(self, mode='pip'):
-        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.DONE
+        return self._mode_attr(mode, 'compilation_status') == COMPILATION_STATUSES.DONE  # NOQA
 
     def pip_recompile(self):
         builder = self.platform.get_builder()

@@ -265,9 +265,14 @@ class DependencyGraph(object):
         return tainted
 
     def remove_orphaned_requirements(self):
+        tainted = False
+
         for round in itertools.count(1):
             if not self._remove_round():
                 break
+            tainted = True
+
+        return tainted
 
     def compile(self, requirements):
         self._nodes = collections.OrderedDict()
@@ -289,14 +294,23 @@ class DependencyGraph(object):
                 self._log.write('  {}\n'.format(node.requirement))
             self._log.write('\n')
 
-            if not self._compile_round():
-                self._log.write('--------------------------------------------\n')
-                self._log.write('Result of round {}: stable, done\n\n'.format(round))
-                break
+            tainted = False
+            tainted |= self._compile_round()
+            tainted |= self.remove_orphaned_requirements()
 
-            self.remove_orphaned_requirements()
-            self._log.write('--------------------------------------------\n')
-            self._log.write('Result of round {}: not stable\n\n'.format(round))
+            if not tainted:
+                self._log.write(
+                    '--------------------------------------------\n'
+                    'Result of round {}: stable, done\n\n'
+                    .format(round)
+                )
+                break
+            else:
+                self._log.write(
+                    '--------------------------------------------\n'
+                    'Result of round {}: not stable\n\n'
+                    .format(round)
+                )
 
         return self._log.getvalue()
 

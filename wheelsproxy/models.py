@@ -331,8 +331,9 @@ def upload_build_to(self, filename):
 
 
 def upload_external_build_to(self, filename):
+    url = self.external_url.encode('utf-8')
     return '__external__/{platform}/{url_hash}/{filename}'.format(
-        url_hash=hashlib.sha256(self.external_url).hexdigest(),
+        url_hash=hashlib.sha256(url).hexdigest(),
         platform=self.platform.slug,
         filename=filename,
     )

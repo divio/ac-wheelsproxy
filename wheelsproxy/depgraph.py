@@ -33,6 +33,11 @@ class UnsatisfiedDependency(CompilationFailed):
     versions = attr.ib(convert=tuple)
 
 
+@attr.s
+class IncompatibleRequirements(CompilationFailed):
+    requirements = attr.ib(convert=tuple)
+
+
 def merge_requirements(*reqs):
     assert reqs
 
@@ -65,7 +70,8 @@ def merge_requirements(*reqs):
 
     if url:
         key, version = str(furl.furl(url).fragment.args['egg']).split('==')
-        assert parse_version(version) in req
+        if parse_version(version) not in req:
+            raise IncompatibleRequirements(reqs)
         req = Requirement.parse('{}@{}'.format(key, url))
 
     return req
@@ -81,7 +87,7 @@ def find_best_release(indexes, req):
             continue
         versions.extend(package.get_versions())
 
-    for version, release in sorted(versions, reverse=True):
+    for version, release in sorted(versions, reverse=True, key=lambda v: v[0]):
         # TODO .is_prerelease is too naive, if req is ==
         if not version.is_prerelease and version in req:
             return release
@@ -256,9 +262,17 @@ class DependencyGraph(object):
                         'Could not find a version that matches {}\n'
                         .format(e.requirement)
                     )
-                    self._log.write(textwrap.wrap('Tried: {}\n'.format(
+                    self._log.write(textwrap.fill('Tried: {}\n'.format(
                         ', '.join([str(v) for v in e.versions])
                     )))
+                    raise
+                except IncompatibleRequirements as e:
+                    self._log.write(
+                        'Cannot merge incompatible requirements:\n'
+                    )
+                    self._log.write(
+                        '\n'.join([str(v) for v in e.requirements])
+                    )
                     raise
             tainted |= self._add_requirements(node)
 

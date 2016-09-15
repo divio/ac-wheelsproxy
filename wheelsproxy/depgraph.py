@@ -262,7 +262,7 @@ class DependencyGraph(object):
                         'Could not find a version that matches {}\n'
                         .format(e.requirement)
                     )
-                    self._log.write(textwrap.wrap('Tried: {}\n'.format(
+                    self._log.write(textwrap.fill('Tried: {}\n'.format(
                         ', '.join([str(v) for v in e.versions])
                     )))
                     raise

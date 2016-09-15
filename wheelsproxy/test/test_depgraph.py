@@ -185,6 +185,14 @@ def test_compile():
     assert 'dist-d' not in graph
 
 
+def test_merge_incompatible_url_requirement():
+    with pytest.raises(depgraph.IncompatibleRequirements):
+        depgraph.merge_requirements(
+            Requirement.parse('dist>=1.1'),
+            Requirement.parse('dist@http://example.com#egg=dist==1.0'),
+        )
+
+
 @pytest.mark.django_db
 def test_find_best_release_multiindex_same_version():
     indexes = [

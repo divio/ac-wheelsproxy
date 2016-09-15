@@ -33,6 +33,11 @@ class UnsatisfiedDependency(CompilationFailed):
     versions = attr.ib(convert=tuple)
 
 
+@attr.s
+class IncompatibleRequirements(CompilationFailed):
+    requirements = attr.ib(convert=tuple)
+
+
 def merge_requirements(*reqs):
     assert reqs
 
@@ -65,7 +70,8 @@ def merge_requirements(*reqs):
 
     if url:
         key, version = str(furl.furl(url).fragment.args['egg']).split('==')
-        assert parse_version(version) in req
+        if parse_version(version) not in req:
+            raise IncompatibleRequirements(reqs)
         req = Requirement.parse('{}@{}'.format(key, url))
 
     return req
@@ -259,6 +265,14 @@ class DependencyGraph(object):
                     self._log.write(textwrap.wrap('Tried: {}\n'.format(
                         ', '.join([str(v) for v in e.versions])
                     )))
+                    raise
+                except IncompatibleRequirements as e:
+                    self._log.write(
+                        'Cannot merge incompatible requirements:\n'
+                    )
+                    self._log.write(
+                        '\n'.join([str(v) for v in e.requirements])
+                    )
                     raise
             tainted |= self._add_requirements(node)
 

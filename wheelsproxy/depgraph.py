@@ -81,7 +81,7 @@ def find_best_release(indexes, req):
             continue
         versions.extend(package.get_versions())
 
-    for version, release in sorted(versions, reverse=True):
+    for version, release in sorted(versions, reverse=True, key=lambda v: v[0]):
         # TODO .is_prerelease is too naive, if req is ==
         if not version.is_prerelease and version in req:
             return release

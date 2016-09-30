@@ -27,7 +27,7 @@ class AppSettings(Settings):
     SECURE_HSTS_SECONDS = Value(int, default=0)
 
     RAVEN_CONFIG = Dictionary({
-        'dsb': Value(str, key='SENTRY_DSN', default=None),
+        'dsn': Value(str, key='SENTRY_DSN', default=None),
         'release': computed_value(get_version),
     })
 

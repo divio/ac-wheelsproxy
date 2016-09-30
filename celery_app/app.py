@@ -11,7 +11,7 @@ app.config_from_object('django.conf:settings')
 app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
 
 raven_config = getattr(settings, 'RAVEN_CONFIG', {})
-sentry_dsn = raven_config.get('DSN', None)
+sentry_dsn = raven_config.get('dsn', None)
 if sentry_dsn:
     client = Client(dsn=sentry_dsn)
     register_logger_signal(client)

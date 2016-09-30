@@ -16,3 +16,18 @@ def test_upload_external_build_to():
     # The filename has to be preserved in order for pip to correctly
     # detect the wheel compatibility
     assert os.path.basename(path) == filename
+
+
+def test_ordering_same_normalized_version():
+    releases = [
+        models.Release(version='1.0'),
+        models.Release(version='2'),
+        models.Release(version='2.0'),
+    ]
+
+    sorting_tuple = [
+        (rel.parsed_version, rel)
+        for rel in releases
+    ]
+
+    assert sorted(sorting_tuple, key=lambda t: t[0]) == sorting_tuple

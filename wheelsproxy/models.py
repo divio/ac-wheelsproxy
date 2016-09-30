@@ -299,7 +299,7 @@ class Package(models.Model):
         return sorted([
             (rel.parsed_version, rel)
             for rel in self.release_set.all()
-        ], reverse=True)
+        ], reverse=True, key=lambda r: r[0])
 
 
 class Release(models.Model):

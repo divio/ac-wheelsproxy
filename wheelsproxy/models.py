@@ -40,9 +40,30 @@ COMPILATION_STATUSES = Choices(
 )
 
 
+def _get_alternate_versions(version):
+    """
+    Returns a set of alternate version numbers for the given version.
+    E.g. for `4.0` returns `{4, 4.0, 4.0.0}`
+    """
+    # TODO: Add a normalized_version field to the release model instead?
+    possible_versions = set([version])
+
+    ver = version
+    while ver.endswith('.0'):
+        ver = ver[:-2]
+        possible_versions.add(ver)
+
+    ver = version
+    while ver.count('.') < 2:
+        ver = ver + '.0'
+        possible_versions.add(ver)
+
+    return possible_versions
+
+
 def get_release(indexes, package_slug, version):
     candidates = list(Release.objects.filter(
-        version=version,
+        version__in=_get_alternate_versions(version),
         package__slug=package_slug,
         package__index__in=indexes,
     ).select_related('package'))
@@ -283,7 +304,7 @@ class Package(models.Model):
 
 class Release(models.Model):
     package = models.ForeignKey(Package)
-    version = models.CharField(max_length=200)
+    version = models.CharField(max_length=200, db_index=True)
     url = models.URLField(
         verbose_name=_('URL'),
         blank=True,

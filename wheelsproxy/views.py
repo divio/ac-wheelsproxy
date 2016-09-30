@@ -1,7 +1,12 @@
 import six
 
 from django.db import transaction
-from django.http import Http404, HttpResponse, HttpResponseBadRequest
+from django.http import (
+    Http404,
+    HttpResponse,
+    HttpResponseBadRequest,
+    UnreadablePostError,
+)
 from django.core.cache import cache as cache_backend
 from django.core.cache.backends import dummy
 from django.core.urlresolvers import reverse
@@ -156,7 +161,13 @@ class RequirementsProcessingMixin(object):
                 .dispatch(request, *args, **kwargs))
 
     def post(self, request, *args, **kwargs):
-        return self.process_body(request.body)
+        try:
+            return self.process_body(request.body)
+        except UnreadablePostError:
+            raise HttpResponseBadRequest(
+                'Malformed request payload received',
+                content_type='text/plain',
+            )
 
 
 class RequirementsCompilationView(RequirementsProcessingMixin,

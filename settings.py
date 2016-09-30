@@ -19,7 +19,7 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
-    'raven.contrib.django.raven_compat',
+    'raven.contrib.django',
     'django_object_actions',
 
     'celery_app',
@@ -27,7 +27,7 @@ INSTALLED_APPS = (
 )
 
 MIDDLEWARE_CLASSES = (
-    'raven.contrib.django.raven_compat.middleware.SentryResponseErrorIdMiddleware',  # NOQA
+    'raven.contrib.django.middleware.SentryResponseErrorIdMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',

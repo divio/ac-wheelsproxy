@@ -120,7 +120,7 @@ class DockerBuilder(object):
         return json.loads(env.getvalue())
 
     def build(self, build):
-        cmd = ' '.join([
+        build_command = ' '.join([
             'pip', 'wheel',
             '--no-deps',
             '--no-clean',
@@ -128,8 +128,17 @@ class DockerBuilder(object):
             '--wheel-dir', '/wheelhouse',
             shlex_quote(build.original_url),
         ])
+        setup_commands = [
+            line.strip()
+            for line in build.setup_commands.splitlines()
+            if line.strip()
+        ]
+        commands = ' && '.join(setup_commands + [build_command])
+        cmd = 'sh -c {}'.format(shlex_quote(commands))
 
         build_log = io.StringIO()
+        build_log.write(cmd)
+        build_log.write('\n')
 
         with tempdir(dir=settings.TEMP_BUILD_ROOT) as wheelhouse:
             image, tag = split_image_name(self.image)

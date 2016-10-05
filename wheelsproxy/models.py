@@ -384,6 +384,10 @@ class BuildBase(models.Model):
         blank=True, null=True,
         editable=False,
     )
+    setup_commands = models.TextField(default='', blank=True, help_text=(
+        'Commands to run before the build if the environment needs to '
+        'be prepared in a special way. One command per line.'
+    ))
     build_timestamp = models.DateTimeField(
         blank=True, null=True,
         editable=False,

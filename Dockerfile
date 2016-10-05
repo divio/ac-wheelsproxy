@@ -1,4 +1,4 @@
-FROM aldryn/base:py3-3.17
+FROM aldryn/base:py3-3.18
 RUN mkdir -p /app
 RUN pipsi install tox
 WORKDIR /app

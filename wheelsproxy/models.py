@@ -6,7 +6,7 @@ import hashlib
 import six
 
 from pkg_resources import parse_version, Requirement, safe_extra
-from pkg_resources.extern.packaging.markers import Marker
+from packaging.markers import Marker
 
 import furl
 
@@ -201,6 +201,14 @@ class Package(models.Model):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     index = models.ForeignKey(BackingIndex)
+    default_setup_commands = models.TextField(
+        default='',
+        blank=True,
+        help_text=(
+            'Commands to run before the build if the environment needs to '
+            'be prepared in a special way. One command per line.'
+        ),
+    )
 
     class Meta:
         unique_together = ('slug', 'index')
@@ -329,7 +337,10 @@ class Release(models.Model):
 
     def get_build(self, platform):
         build, created = Build.objects.get_or_create(
-            release=self, platform=platform)
+            release=self,
+            platform=platform,
+            setup_commands=self.package.default_setup_commands,
+        )
         return build
 
     @cached_property
@@ -342,12 +353,14 @@ class Release(models.Model):
 
 
 def upload_build_to(self, filename):
-    return '{index}/{platform}/{package}/{version}/{filename}'.format(
-        index=self.release.package.index.slug,
-        package=self.release.package.slug,
-        version=self.release.version,
-        platform=self.platform.slug,
-        filename=filename,
+    return os.path.join(
+        self.release.package.index.slug,
+        self.platform.slug,
+        self.release.package.slug,
+        self.release.version,
+        str(int(self.build_timestamp.timestamp())),
+        self.md5_digest,
+        filename,
     )
 
 
@@ -491,7 +504,7 @@ class Build(BuildBase):
     build = models.FileField(
         storage=storage.dsn_configured_storage('BUILDS_STORAGE_DSN'),
         upload_to=upload_build_to,
-        max_length=255, blank=True, null=True,
+        max_length=512, blank=True, null=True,
     )
 
     objects = BuildsManager()

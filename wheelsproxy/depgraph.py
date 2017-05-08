@@ -10,10 +10,8 @@ import attr
 from django.core.exceptions import ObjectDoesNotExist
 
 from pkg_resources import Requirement, parse_version
-from pkg_resources.extern.packaging.specifiers import SpecifierSet
-from pkg_resources.extern.packaging.requirements import (
-    Requirement as BaseRequirement,
-)
+from packaging.specifiers import SpecifierSet
+from packaging.requirements import Requirement as BaseRequirement
 
 from . import utils
 

@@ -353,12 +353,14 @@ class Release(models.Model):
 
 
 def upload_build_to(self, filename):
-    return '{index}/{platform}/{package}/{version}/{filename}'.format(
-        index=self.release.package.index.slug,
-        package=self.release.package.slug,
-        version=self.release.version,
-        platform=self.platform.slug,
-        filename=filename,
+    return os.path.join(
+        self.release.package.index.slug,
+        self.platform.slug,
+        self.release.package.slug,
+        self.release.version,
+        str(int(self.build_timestamp.timestamp())),
+        self.md5_digest,
+        filename,
     )
 
 
@@ -502,7 +504,7 @@ class Build(BuildBase):
     build = models.FileField(
         storage=storage.dsn_configured_storage('BUILDS_STORAGE_DSN'),
         upload_to=upload_build_to,
-        max_length=255, blank=True, null=True,
+        max_length=512, blank=True, null=True,
     )
 
     objects = BuildsManager()

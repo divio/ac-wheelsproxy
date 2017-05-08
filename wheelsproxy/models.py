@@ -339,7 +339,7 @@ class Release(models.Model):
         build, created = Build.objects.get_or_create(
             release=self,
             platform=platform,
-            setup_commands=self.package.default_setup_commands,
+            defaults={'setup_commands': self.package.default_setup_commands},
         )
         return build
 

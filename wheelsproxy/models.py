@@ -201,6 +201,14 @@ class Package(models.Model):
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255)
     index = models.ForeignKey(BackingIndex)
+    default_setup_commands = models.TextField(
+        default='',
+        blank=True,
+        help_text=(
+            'Commands to run before the build if the environment needs to '
+            'be prepared in a special way. One command per line.'
+        ),
+    )
 
     class Meta:
         unique_together = ('slug', 'index')
@@ -329,7 +337,10 @@ class Release(models.Model):
 
     def get_build(self, platform):
         build, created = Build.objects.get_or_create(
-            release=self, platform=platform)
+            release=self,
+            platform=platform,
+            setup_commands=self.package.default_setup_commands,
+        )
         return build
 
     @cached_property

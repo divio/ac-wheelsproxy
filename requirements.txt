@@ -46,7 +46,7 @@ requests==2.13.0
 simplegeneric==0.8.1       # via ipython
 six==1.10.0                # via coolfig, django-click, django-environ, docker-py, docker-pycreds, furl, orderedmultidict, packaging, prompt-toolkit, setuptools, traitlets, websocket-client
 traitlets==4.3.2           # via ipython
-uwsgi==2.0.15
+uwsgi==2.0.16
 wcwidth==0.1.7             # via prompt-toolkit
 websocket-client==0.40.0   # via docker-py
 

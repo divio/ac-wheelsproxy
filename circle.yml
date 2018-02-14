@@ -7,6 +7,8 @@ machine:
     - curl -L https://github.com/docker/compose/releases/download/1.8.0/docker-compose-`uname -s`-`uname -m` > ~/bin/docker-compose
     - chmod +x ~/bin/docker-compose
     - docker-compose --version
+    # Upgrade pyenv
+    - cd /home/ubuntu/.pyenv; git pull
   python:
     version: 3.6.3
   services:

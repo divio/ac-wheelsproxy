@@ -7,11 +7,8 @@ machine:
     - curl -L https://github.com/docker/compose/releases/download/1.8.0/docker-compose-`uname -s`-`uname -m` > ~/bin/docker-compose
     - chmod +x ~/bin/docker-compose
     - docker-compose --version
-    # Install python 3.5.1 (fast version)
-    - wget https://s3.amazonaws.com/circle-downloads/circle-pyenv-python-3.5.1_1.0_amd64.deb
-    - sudo dpkg -i circle-pyenv-python-3.5.1_1.0_amd64.deb
   python:
-    version: 3.5.1
+    version: 3.6.3
   services:
     - docker
     - redis

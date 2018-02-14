@@ -68,7 +68,7 @@ def parse_requirements(strs):
     for req in split_requirements(strs):
         try:
             url = furl.furl(req)
-        except:
+        except Exception:
             pass
         else:
             if url.scheme:
@@ -83,7 +83,7 @@ def retry_call(times, func, *args, **kwargs):
     while True:
         try:
             return func(*args, **kwargs)
-        except:
+        except Exception:
             if times:
                 times -= 1
             else:

@@ -6,7 +6,7 @@ import hashlib
 import six
 
 from pkg_resources import parse_version, Requirement, safe_extra
-from packaging.markers import Marker
+from pkg_resources.extern.packaging.markers import Marker
 
 import furl
 

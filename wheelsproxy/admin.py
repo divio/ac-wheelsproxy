@@ -144,10 +144,12 @@ class PackageAdmin(adminutils.ModelAdmin):
 
     actions = (
         'expire_cache_action',
+        'sync_package_action'
     )
 
     change_actions = (
         'expire_cache_action',
+        'sync_package_action'
     )
 
     index_name = linked_relation('index')
@@ -159,6 +161,14 @@ class PackageAdmin(adminutils.ModelAdmin):
     expire_cache_action.label = _('Invalidate cache')
     expire_cache_action.short_description = _(
         'Invalidate cache for the selected packages (all platforms)')
+
+    @queryset_action
+    def sync_package_action(self, request, queryset):
+        for package in queryset.iterator():
+            package.index.import_package(p.slug) 
+    expire_cache_action.label = _('Sync package from index')
+    expire_cache_action.short_description = _(
+        'Sync package from index')
 
 
 class BuildInline(admin.TabularInline):

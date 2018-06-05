@@ -72,6 +72,7 @@ jobs:
               docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
               git config user.email "$GIT_EMAIL" && git config user.name "$GIT_USERNAME"
               git tag -m "Release version $VERSION" -m "$CIRCLE_COMPARE_URL" -m "$CIRCLE_BUILD_URL" $VERSION
+              git push origin $VERSION
               docker push $IMAGE_NAME:$MAJOR_VERSION.$CIRCLE_BUILD_NUM
               docker push $IMAGE_NAME:$MAJOR_VERSION
               docker push $IMAGE_NAME:latest

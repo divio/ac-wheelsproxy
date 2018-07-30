@@ -1,4 +1,5 @@
 import re
+import random
 
 import furl
 
@@ -88,3 +89,10 @@ def retry_call(times, func, *args, **kwargs):
                 times -= 1
             else:
                 raise
+
+
+def exponential_backoff(retries, max_wait=None, min_wait=0):
+    wait = random.uniform(2, 4) ** retries
+    if max_wait is not None:
+        wait = min(max_wait, wait)
+    return int(max(min_wait, wait))

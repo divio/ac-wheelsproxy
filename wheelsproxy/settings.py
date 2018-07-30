@@ -20,6 +20,7 @@ class AppSettings(Settings):
     ALWAYS_REDIRECT_DOWNLOADS = Value(boolean, default=False)
     TEMP_BUILD_ROOT = Value(str, default='/tmp')
     COMPILE_CACHE_ROOT = Value(str, default='/cache')
+    MAX_CACHE_BUSTING_RETRIES = Value(int, default=3)
 
     SECURE_SSL_REDIRECT = Value(boolean, default=False)
     SESSION_COOKIE_SECURE = Value(boolean, default=False)

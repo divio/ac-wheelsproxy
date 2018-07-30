@@ -120,22 +120,23 @@ class PyPIClient(IndexAPIClient):
     def get_package_releases(self, package_name, ensure_serial=None):
         for i in range(settings.MAX_CACHE_BUSTING_RETRIES + 1):
             response = self._request_package_releases(package_name)
-            if ensure_serial is not None:
-                serial = int(response.headers.get('X-PyPI-Last-Serial'))
-                if serial < ensure_serial:
-                    # The response is stale (probably cached by an upstream
-                    # CDN), wait some time and retry...
-                    time.sleep(exponential_backoff(i))
-                    continue
-            else:
+            if ensure_serial is None:
                 break
+
+            serial = int(response.headers.get('X-PyPI-Last-Serial'))
+            if serial >= ensure_serial:
+                # The response is up to date, we can process it...
+                break
+
+            # The response is stale (probably cached by an upstream
+            # CDN), wait some time and retry...
+            time.sleep(exponential_backoff(i))
         else:
             raise RuntimeError((
                 'Could not bust stale package cache for {} '
-                '(should be at {}, is at {})'
+                '(should be at least at {}, is at {})'
             ).format(package_name, ensure_serial, serial))
 
-        # The response is up to date, we can process it...
         releases = response.json()['releases']
         return {
             k: self._clean_releases(v)

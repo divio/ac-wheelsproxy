@@ -7,7 +7,7 @@ django-click
 django-environ
 django-extended-choices
 django-object-actions
-django-redis
+django-redis<4.9.0
 django-storages-redux
 docker-py>=1.4.0,<2.0
 execnet

@@ -1,18 +1,16 @@
 import logging
+import time
 from collections import namedtuple
 import io
 
 import six
-
 import requests
-
 import furl
-
 from six.moves import xmlrpc_client, range
-
+from django.conf import settings
 from execnet.gateway_base import Unserializer
 
-from .utils import retry_call
+from .utils import retry_call, exponential_backoff
 
 
 log = logging.getLogger(__name__)
@@ -63,7 +61,7 @@ class IndexAPIClient(object):
     def iter_updated_packages(self, since_serial):
         raise NotImplementedError
 
-    def get_package_releases(self, package_name):
+    def get_package_releases(self, package_name, ensure_serial=None):
         raise NotImplementedError
 
     def get_version_releases(self, package_name, version):
@@ -104,7 +102,7 @@ class PyPIClient(IndexAPIClient):
             rel['packagetype'],
         ) for rel in version_details]
 
-    def get_package_releases(self, package_name):
+    def _request_package_releases(self, package_name):
         url = furl.furl(self.url)
         url.path.add([package_name, 'json'])
 
@@ -117,9 +115,32 @@ class PyPIClient(IndexAPIClient):
                         .format(response.status_code, self.url, content))
             raise RuntimeError('Invalid response from index: {}'
                                .format(response.status_code))
+        return response
 
+    def get_package_releases(self, package_name, ensure_serial=None):
+        for i in range(settings.MAX_CACHE_BUSTING_RETRIES + 1):
+            response = self._request_package_releases(package_name)
+            if ensure_serial is not None:
+                serial = int(response.headers.get('X-PyPI-Last-Serial'))
+                if serial < ensure_serial:
+                    # The response is stale (probably cached by an upstream
+                    # CDN), wait some time and retry...
+                    time.sleep(exponential_backoff(i))
+                    continue
+            else:
+                break
+        else:
+            raise RuntimeError((
+                'Could not bust stale package cache for {} '
+                '(should be at {}, is at {})'
+            ).format(package_name, ensure_serial, serial))
+
+        # The response is up to date, we can process it...
         releases = response.json()['releases']
-        return {k: self._clean_releases(v) for k, v in six.iteritems(releases)}
+        return {
+            k: self._clean_releases(v)
+            for k, v in six.iteritems(releases)
+        }
 
 
 class DevPIClient(IndexAPIClient):
@@ -175,7 +196,7 @@ class DevPIClient(IndexAPIClient):
             type,
         ) for rel, type in releases if type]
 
-    def get_package_releases(self, package_name):
+    def get_package_releases(self, package_name, ensure_serial=None):
         url = furl.furl(self.url)
         url.path.add(package_name)
 

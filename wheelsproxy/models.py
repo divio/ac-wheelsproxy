@@ -148,7 +148,7 @@ class BackingIndex(models.Model):
         packages_to_update = self.client.iter_updated_packages(serial)
         for package_name, serial in packages_to_update:
             if package_name:
-                if not self.import_package(package_name):
+                if not self.import_package(package_name, ensure_serial=serial):
                     # Nothing imported: remove the package
                     slug = utils.normalize_package_name(package_name)
                     Package.objects.filter(index=self, slug=slug).delete()
@@ -165,10 +165,13 @@ class BackingIndex(models.Model):
         for i in self.itersync():
             pass
 
-    def import_package(self, package_name):
+    def import_package(self, package_name, ensure_serial=None):
         # log.info('importing {} from {}'.format(package_name, self.url))
         try:
-            versions = self.client.get_package_releases(package_name)
+            versions = self.client.get_package_releases(
+                package_name,
+                ensure_serial=ensure_serial,
+            )
         except client.PackageNotFound:
             log.debug('package {} not found on {}'
                       .format(package_name, self.url))

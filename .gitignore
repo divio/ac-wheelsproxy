@@ -4,3 +4,4 @@ celerybeat-schedule*
 .coverage
 .cache
 .htmlcov
+.pytest_cache

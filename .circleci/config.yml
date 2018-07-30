@@ -1,0 +1,79 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/python:3.6.4
+        environment:
+          GIT_EMAIL: circleci@aldryn.com
+          GIT_USERNAME: "Circle CI Bot"
+          IMAGE_NAME: divio/ac-wheelsproxy
+          MAJOR_VERSION: 2
+
+    steps:
+      - run:
+          name: Define version
+          command: echo "VERSION=$MAJOR_VERSION.$CIRCLE_BUILD_NUM" >> $BASH_ENV
+
+      - setup_remote_docker:
+          version: 17.11.0-ce
+          docker_layer_caching: true
+
+      - checkout
+
+      - run:
+          name: Define versions
+          command: |
+            echo $VERSION >VERSION
+            echo $CIRCLE_SHA1 >COMMIT
+
+      - run:
+          name: Run postgres
+          command: >
+            docker run --name postgres -d
+            -e POSTGRES_PASSWORD=pgpwd
+            -e POSTGRES_USER=pgusr
+            -e POSTGRES_DB=pgdb
+            postgres:9.5
+
+      - run:
+          name: Run redis
+          command: >
+            docker run --name redis -d
+            -e PASSWORD=redispwd
+            aldryn/redis:latest
+
+      - run:
+          name: Build images
+          command: >
+            docker build
+            -t $IMAGE_NAME:$MAJOR_VERSION.$CIRCLE_BUILD_NUM
+            -t $IMAGE_NAME:$MAJOR_VERSION
+            -t $IMAGE_NAME:latest
+            .
+
+      - run:
+          name: Run tests
+          command: >
+            docker run 
+            --link redis
+            --link postgres
+            -e "DATABASES_DEFAULT=postgres://pgusr:pgpwd@postgres/pgdb"
+            -e "CELERY_BROKER_URL=redis://:redispwd@redis:6379/1"
+            -e "CELERY_RESULT_BACKEND=redis://:redispwd@redis:6379/2"
+            -e "BUILDS_DOCKER_DSN=''"
+            -e "BUILDS_STORAGE_DSN=file:///data"
+            $IMAGE_NAME:latest tox
+
+      - deploy:
+          name: Push docker images to docker hub
+          command: |
+            if [ "${CIRCLE_BRANCH}" == "master" ]; then
+              docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+              git config user.email "$GIT_EMAIL" && git config user.name "$GIT_USERNAME"
+              git tag -m "Release version $VERSION" -m "$CIRCLE_COMPARE_URL" -m "$CIRCLE_BUILD_URL" $VERSION
+              git push origin $VERSION
+              docker push $IMAGE_NAME:$MAJOR_VERSION.$CIRCLE_BUILD_NUM
+              docker push $IMAGE_NAME:$MAJOR_VERSION
+              docker push $IMAGE_NAME:latest
+            fi

@@ -8,11 +8,11 @@ services:
       dockerfile: "Dockerfile"
     command: /bin/true
     volumes:
-      - ".:/app"
+      - "./:/app"
       - "./.data:/data"
       - "${PWD}/.data/tmp:${PWD}/.data/tmp"
       - "${PWD}/.data/cache:${PWD}/.data/cache"
-      - "${DOCKER_CERT_PATH}:/certs"
+      # - "${DOCKER_CERT_PATH}:/certs"
       - "~/.toxenvs/wheelsproxy-docker:/root/.toxenvs/wheelsproxy"
     env_file:
       - ".env.localdev"

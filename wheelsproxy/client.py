@@ -4,19 +4,13 @@ from collections import namedtuple
 import io
 
 import six
-
 import requests
-
 import furl
-
 from six.moves import xmlrpc_client, range
-
+from django.conf import settings
 from execnet.gateway_base import Unserializer
 
 from .utils import retry_call, exponential_backoff
-
-
-MAX_CACHE_BUSTING_RETRIES = 3
 
 
 log = logging.getLogger(__name__)
@@ -124,7 +118,7 @@ class PyPIClient(IndexAPIClient):
         return response
 
     def get_package_releases(self, package_name, ensure_serial=None):
-        for i in range(MAX_CACHE_BUSTING_RETRIES + 1):
+        for i in range(settings.MAX_CACHE_BUSTING_RETRIES + 1):
             response = self._request_package_releases(package_name)
             if ensure_serial is not None:
                 serial = int(response.headers.get('X-PyPI-Last-Serial'))
@@ -133,12 +127,20 @@ class PyPIClient(IndexAPIClient):
                     # CDN), wait some time and retry...
                     time.sleep(exponential_backoff(i))
                     continue
-            # The response is up to date, we can process it...
-            releases = response.json()['releases']
-            return {
-                k: self._clean_releases(v)
-                for k, v in six.iteritems(releases)
-            }
+            else:
+                break
+        else:
+            raise RuntimeError((
+                'Could not bust stale package cache for {} '
+                '(should be at {}, is at {})'
+            ).format(package_name, ensure_serial, serial))
+
+        # The response is up to date, we can process it...
+        releases = response.json()['releases']
+        return {
+            k: self._clean_releases(v)
+            for k, v in six.iteritems(releases)
+        }
 
 
 class DevPIClient(IndexAPIClient):

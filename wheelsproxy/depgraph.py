@@ -55,7 +55,7 @@ def merge_requirements(*reqs):
             req = Requirement.parse(spec)
             assert req.key == key
 
-        specifier &= req.specifier
+        specifier &= SpecifierSet(str(req.specifier))
         extras |= set(req.extras)
 
     req = BaseRequirement(key)

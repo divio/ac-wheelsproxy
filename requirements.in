@@ -8,12 +8,13 @@ django-environ
 django-extended-choices
 django-object-actions
 django-redis<4.9.0
-django-storages-redux
+django-storages
 docker-py>=1.4.0,<2.0
 execnet
 furl
 ipdb
 jsonfield
+packaging
 psycopg2
 raven
 redis

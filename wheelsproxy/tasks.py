@@ -71,6 +71,13 @@ def sync_indexes():
         sync_index(index_pk)
 
 
+@shared_task()
+def sync_package(package_id):
+    from . import models
+    package = models.Package.objects.get(pk=package_id)
+    package.index.import_package(package.slug)
+
+
 @shared_task
 def pip_compile(requirements_id, force=False):
     from . import models

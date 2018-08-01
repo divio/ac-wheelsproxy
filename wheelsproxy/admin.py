@@ -164,10 +164,10 @@ class PackageAdmin(adminutils.ModelAdmin):
 
     @queryset_action
     def sync_package_action(self, request, queryset):
-        for package in queryset.iterator():
-            package.index.import_package(p.slug) 
-    expire_cache_action.label = _('Sync package from index')
-    expire_cache_action.short_description = _(
+        for package_pk in queryset.values_list('pk', flat=True):
+            tasks.sync_package.delay(package_pk)
+    sync_package_action.label = _('Sync package from index')
+    sync_package_action.short_description = _(
         'Sync package from index')
 
 

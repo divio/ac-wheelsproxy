@@ -70,6 +70,10 @@ def split_image_name(name):
 
 
 def extract_wheel_meta(fh):
+    # Not working anymore since wheel>=0.31
+    # https://github.com/pypa/wheel/issues/195
+    # https://www.python.org/dev/peps/pep-0426/
+    # https://github.com/pypa/wheel/commit/595e4a8fc6bed54091ead713933c8ec8ebd1bb51
     with zipfile.ZipFile(fh) as z:
         for member in z.infolist():
             try:

@@ -5,9 +5,14 @@ import tempfile
 
 import requests
 
-from pip.req import parse_requirements, RequirementSet
-from pip.download import is_file_url, is_dir_url, is_vcs_url
-from pip.index import PackageFinder
+try:
+    from pip._internal.req import RequirementSet, parse_requirements
+    from pip._internal.download import is_file_url, is_dir_url, is_vcs_url
+    from pip._internal.index import PackageFinder
+except ImportError:
+    from pip.req import parse_requirements, RequirementSet
+    from pip.download import is_file_url, is_dir_url, is_vcs_url
+    from pip.index import PackageFinder
 
 
 @contextlib.contextmanager

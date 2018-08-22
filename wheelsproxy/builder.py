@@ -87,6 +87,13 @@ def extract_wheel_meta(fh):
 class DockerBuilder(object):
     def __init__(self, platform_spec):
         self.image = platform_spec["image"]
+        # TODO: Use --find-links to provide a directory already containing
+        #       at least `wheel` and `setuptools`, but possibly additional
+        #       build-time dependencies instead of requiring the use of
+        #       --no-build-isolation.
+        self.build_options = platform_spec.get(
+            "build_options", ["--no-deps", "--no-clean", "--no-index"]
+        )
         self.client = get_docker_client(settings.BUILDS_DOCKER_DSN)
 
     def get_environment(self):
@@ -125,16 +132,9 @@ class DockerBuilder(object):
 
     def build(self, build):
         build_command = " ".join(
-            [
-                "pip",
-                "wheel",
-                "--no-deps",
-                "--no-clean",
-                "--no-index",
-                "--wheel-dir",
-                "/wheelhouse",
-                shlex_quote(build.original_url),
-            ]
+            ["pip", "wheel", "--wheel-dir", "/wheelhouse"]
+            + self.build_options
+            + [shlex_quote(build.original_url)]
         )
         setup_commands = [
             line.strip()

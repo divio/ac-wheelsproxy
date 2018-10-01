@@ -78,4 +78,3 @@ class AppSettings(Settings):
     @computed_value
     def SECURE_HSTS_SECONDS(self):
         return 60 * 60 * 24 * 365 if self.SECURE else 0
-

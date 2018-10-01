@@ -8,11 +8,9 @@ directives. Those are read from environment variables.
 import sys
 from datetime import timedelta
 
-from coolfig import EnvConfig, load_django_settings
-
+from coolfig import EnvConfig, EnvDirConfig, load_django_settings
 
 INSTALLED_APPS = (
-    'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -21,9 +19,11 @@ INSTALLED_APPS = (
 
     'raven.contrib.django',
     'django_object_actions',
-
     'celery_app',
     'wheelsproxy',
+    'divio_sso',
+    'social_django',
+    'django.contrib.admin',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -105,8 +105,11 @@ CELERY_ACKS_LATE = True
 
 CELERYD_PREFETCH_MULTIPLIER = 1
 
+LOGIN_REDIRECT_URL = "/admin/"
 
-load_django_settings(EnvConfig(), locals())
+load_django_settings(
+    [EnvDirConfig("/run/secrets/divio.com"), EnvConfig()], locals()
+)
 
 
 import celery_app.app  # NOQA

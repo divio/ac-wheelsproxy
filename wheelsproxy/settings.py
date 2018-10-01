@@ -1,6 +1,6 @@
 import os
 
-from coolfig import Settings, Value, Dictionary, computed_value
+from coolfig import Settings, Value, Dictionary, computed_value, types
 from coolfig.types import boolean
 
 
@@ -22,11 +22,6 @@ class AppSettings(Settings):
     COMPILE_CACHE_ROOT = Value(str, default='/cache')
     MAX_CACHE_BUSTING_RETRIES = Value(int, default=3)
 
-    SECURE_SSL_REDIRECT = Value(boolean, default=False)
-    SESSION_COOKIE_SECURE = Value(boolean, default=False)
-    CSRF_COOKIE_SECURE = Value(boolean, default=False)
-    SECURE_HSTS_SECONDS = Value(int, default=0)
-
     RAVEN_CONFIG = Dictionary({
         'dsn': Value(str, key='SENTRY_DSN', default=None),
         'release': computed_value(get_version),
@@ -36,3 +31,51 @@ class AppSettings(Settings):
     BUILDS_DOCKER_DSN = Value(str)
 
     SERVE_BUILDS = Value(boolean, default=False)
+
+    PROXIED = Value(types.boolean, default=False)
+    SECURE = Value(types.boolean, default=True)
+
+    @computed_value
+    def USE_X_FORWARDED_HOST(self):
+        return self.PROXIED
+
+    @computed_value
+    def USE_X_FORWARDED_PORT(self):
+        return self.PROXIED
+
+    @computed_value
+    def SECURE_PROXY_SSL_HEADER(self):
+        return ("HTTP_X_FORWARDED_PROTO", "https") if self.PROXIED else None
+
+    @computed_value
+    def CSRF_USE_SESSIONS(self):
+        return self.SECURE
+
+    @computed_value
+    def SESSION_COOKIE_HTTPONLY(self):
+        return self.SECURE
+
+    @computed_value
+    def SESSION_COOKIE_SECURE(self):
+        return self.SECURE
+
+    @computed_value
+    def SESSION_COOKIE_SAMESITE(self):
+        return "Strict"
+
+    @computed_value
+    def SECURE_BROWSER_XSS_FILTER(self):
+        return self.SECURE
+
+    @computed_value
+    def SECURE_CONTENT_TYPE_NOSNIFF(self):
+        return self.SECURE
+
+    @computed_value
+    def SECURE_SSL_REDIRECT(self):
+        return self.SECURE
+
+    @computed_value
+    def SECURE_HSTS_SECONDS(self):
+        return 60 * 60 * 24 * 365 if self.SECURE else 0
+

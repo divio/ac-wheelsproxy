@@ -8,7 +8,8 @@ django-environ
 django-extended-choices
 django-object-actions
 django-redis<4.9.0
-django-storages
+django-storages<=1.6.6
+divio-sso
 docker-py>=1.4.0,<2.0
 execnet
 furl

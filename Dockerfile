@@ -2,7 +2,7 @@ FROM divio/base:4.4-py3.6-alpine3.6
 ENV WHEELSPROXY_URL=https://wheels.aldryn.net/v1/divio-internal+pypi/$WHEELS_PLATFORM/ \
     PIP_INDEX_URL=https://wheels.aldryn.net/v1/divio-internal+pypi/$WHEELS_PLATFORM/+simple/
 RUN pipsi install tox
-RUN apk add lapack xmlsec
+RUN apk add xmlsec
 COPY requirements.* /app/
 RUN pip-reqs resolve && \
     pip install \

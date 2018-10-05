@@ -13,4 +13,5 @@ urlpatterns = [
     url(r'^static/(?P<path>.*)$', static.serve, {
         'document_root': settings.STATIC_ROOT,
     }),
+    url(r'^sso/', include('divio_sso.urls'))
 ]

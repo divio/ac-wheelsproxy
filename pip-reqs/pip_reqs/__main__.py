@@ -1,50 +1,75 @@
-import click
+import argparse
+import os
+import sys
 
 from .client import WheelsproxyClient, CompilationError
 from .parser import RequirementsParser
 
 
-@click.group()
-@click.option('--wheelsproxy', '-w', envvar='WHEELSPROXY_URL', required=True)
-@click.pass_context
-def main(ctx, wheelsproxy):
-    ctx.obj = WheelsproxyClient(wheelsproxy)
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-w", "--wheelsproxy", default=os.environ.get("WHEELSPROXY_URL")
+    )
+    subparsers = parser.add_subparsers()
+
+    compile_parser = subparsers.add_parser("compile")
+    compile_parser.set_defaults(func=compile)
+    compile_parser.add_argument("infile", default="requirements.in")
+    compile_parser.add_argument("outfile", default="requirements.txt")
+
+    resolve_parser = subparsers.add_parser("resolve")
+    resolve_parser.set_defaults(func=resolve)
+    resolve_parser.add_argument("infile", default="requirements.txt")
+    resolve_parser.add_argument("outfile", default="requirements.urls")
+
+    args = parser.parse_args()
+
+    if not args.wheelsproxy:
+        print(
+            (
+                "Either the --wheelsproxy argument or a WHEELSPROXY_URL "
+                "environment variable are required."
+            ),
+            file=sys.stderr,
+        )
+
+    client = WheelsproxyClient(args.wheelsproxy)
+    args.func(client, args)
 
 
-@main.command()
-@click.pass_context
-@click.argument('infile', default='requirements.in', required=False,
-                type=click.Path(exists=True))
-@click.argument('outfile', default='requirements.txt', required=False,
-                type=click.File('wb', lazy=True))
-def compile(ctx, infile, outfile):
+def compile(client, args):
     parser = RequirementsParser()
-    ext_reqs, local_reqs = parser.parse(infile)
+    ext_reqs, local_reqs = parser.parse(args.infile)
     try:
-        compiled_reqs = ctx.obj.compile(b'\n'.join(ext_reqs))
+        compiled_reqs = client.compile(b"\n".join(ext_reqs))
     except CompilationError as e:
-        click.echo(e.args[0], err=True)
-        ctx.exit(1)
-    outfile.write(compiled_reqs)
-    if local_reqs:
-        outfile.write(b'\n'.join([
-            b'',
-            b'# The following packages are available only locally.',
-            b'# Their dependencies *have* been considered while',
-            b'# resolving the full dependency tree:',
-        ] + local_reqs))
-    outfile.write(b'\n')
+        print(e.args[0], file=sys.stderr)
+        sys.exit(1)
+    with open(args.outfile, "wb") as fh:
+        fh.write(compiled_reqs)
+        if local_reqs:
+            fh.write(
+                b"\n".join(
+                    [
+                        b"",
+                        b"# The following packages are available only locally.",
+                        b"# Their dependencies *have* been considered while",
+                        b"# resolving the full dependency tree:",
+                    ]
+                    + local_reqs
+                )
+            )
+        fh.write(b"\n")
 
 
-@main.command()
-@click.pass_obj
-@click.argument('infile', default='requirements.txt', required=False,
-                type=click.File('rb'))
-@click.argument('outfile', default='requirements.urls', required=False,
-                type=click.File('wb', lazy=True))
-def resolve(obj, infile, outfile):
-    outfile.write(obj.resolve(infile.read()))
+def resolve(client, args):
+    with open(args.infile, "rb") as fh:
+        urls = client.resolve(fh.read())
+
+    with open(args.outfile, "wb") as fh:
+        fh.write(urls)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

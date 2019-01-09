@@ -1,6 +1,16 @@
 CHANGELOG
 =========
 
+
+0.7 (2019-01-09)
+----------------
+
+* Drop Python 2.7 compatibility.
+* Drop support for pip<10.
+* Drop dependencies (click and requests).
+* Use black for formatting.
+
+
 0.6 (2018-08-20)
 ----------------
 

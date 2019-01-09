@@ -3,16 +3,11 @@ import shutil
 import contextlib
 import tempfile
 
-import requests
+from pip._vendor import requests
 
-try:
-    from pip._internal.req import RequirementSet, parse_requirements
-    from pip._internal.download import is_file_url, is_dir_url, is_vcs_url
-    from pip._internal.index import PackageFinder
-except ImportError:
-    from pip.req import parse_requirements, RequirementSet
-    from pip.download import is_file_url, is_dir_url, is_vcs_url
-    from pip.index import PackageFinder
+from pip._internal.req import RequirementSet, parse_requirements
+from pip._internal.download import is_file_url, is_dir_url, is_vcs_url
+from pip._internal.index import PackageFinder
 
 
 @contextlib.contextmanager
@@ -26,14 +21,14 @@ def temporary_directory(*args, **kwargs):
 
 
 def link_req_to_str(req):
-    url = req.link.url.encode('utf8')
+    url = req.link.url.encode("utf8")
     if req.editable:
-        return b'-e ' + url
+        return b"-e " + url
     else:
         return url
 
 
-class RequirementsParser(object):
+class RequirementsParser:
     def __init__(self):
         self.session = requests.Session()
         self.finder = PackageFinder(
@@ -58,8 +53,9 @@ class RequirementsParser(object):
             if is_vcs_url(req.link):
                 # TODO: Is this needed or even supported?
                 raise NotImplementedError(
-                    'Requirement `{}` is not in a supported format'
-                    .format(str(req))
+                    "Requirement `{}` is not in a supported format".format(
+                        str(req)
+                    )
                 )
             elif is_file_url(req.link):
                 if is_dir_url(req.link):
@@ -71,13 +67,14 @@ class RequirementsParser(object):
                 else:
                     # TODO: Is this needed or even supported?
                     raise NotImplementedError(
-                        'Requirement `{}` is not in a supported format'
-                        .format(str(req))
+                        "Requirement `{}` is not in a supported format".format(
+                            str(req)
+                        )
                     )
             else:
                 ext_reqs.append(link_req_to_str(req))
         else:
-            ext_reqs.append(str(req.req).encode('utf8'))
+            ext_reqs.append(str(req.req).encode("utf8"))
 
         return ext_reqs, loc_reqs
 
